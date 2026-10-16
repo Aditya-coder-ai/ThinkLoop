@@ -1,0 +1,25 @@
+"""Current authenticated user profile endpoints."""
+
+from fastapi import APIRouter, Depends
+
+from app.api.deps import get_current_user, rate_limit
+from app.db.models import User
+from app.schemas.user import UserRead
+
+router = APIRouter(tags=["user"])
+
+
+@router.get(
+    "/me",
+    response_model=UserRead,
+    dependencies=[Depends(rate_limit())],
+    summary="Get current user profile",
+    description=(
+        "Returns profile information for the authenticated user, provisioning if first visit."
+    ),
+)
+async def get_me(
+    current_user: User = Depends(get_current_user),
+) -> UserRead:
+    """Return profile of the authenticated user."""
+    return UserRead.model_validate(current_user)
