@@ -61,4 +61,5 @@ jobs:
           AUTH_JWKS_URL: http://localhost:8000/.well-known/jwks.json
           AUTH_ISSUER: https://auth.thinkloop.ai
           AUTH_AUDIENCE: thinkloop-api
+          EMBEDDING_DIM: 1024
         run: make verify

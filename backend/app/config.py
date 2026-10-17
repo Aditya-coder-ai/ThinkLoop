@@ -45,6 +45,17 @@ class Settings(BaseSettings):
     jwks_cache_ttl_seconds: int = 3600
     rate_limit_requests: int = 60
     rate_limit_window_seconds: int = 60
+    embedding_dim: int = Field(default=1024, description="Vector embedding dimension")
+    embedding_endpoint_url: str | None = Field(
+        default=None, description="URL for HTTP embeddings provider"
+    )
+    embedding_api_key: str | None = Field(
+        default=None, description="API key for HTTP embeddings provider"
+    )
+    embedding_model: str = Field(
+        default="text-embedding-3-small",
+        description="Model name for HTTP embeddings provider",
+    )
 
     # Optional AI/LLM extension point (Part 2/3)
     gemini_api_key: str | None = Field(

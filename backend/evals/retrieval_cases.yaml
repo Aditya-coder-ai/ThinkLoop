@@ -1,0 +1,179 @@
+# Thinkloop Retrieval Evaluation Labeled Cases
+# Ground truth dataset for evaluating misconception vector retrieval
+# Includes >= 40 cases, with at least 8 negative controls and varied phrasing
+
+# --- Negative Controls (Scientifically correct utterances that should NOT match) ---
+- text: "A satellite in circular orbit is constantly accelerating toward Earth's center even though its orbital speed remains constant."
+  expected_misconception_id: null
+  concept_id: uniform_circular_motion
+
+- text: "An object moving at constant speed along a frictionless surface maintains its velocity without needing an engine or push."
+  expected_misconception_id: null
+  concept_id: newtons_first_law
+
+- text: "When an apple falls toward Earth, the gravitational force exerted by the apple on Earth is identical in magnitude to the force exerted by Earth on the apple."
+  expected_misconception_id: null
+  concept_id: newtons_third_law
+
+- text: "In a vacuum chamber, a lead sphere and an eagle feather dropped from the same height strike the ground simultaneously."
+  expected_misconception_id: null
+  concept_id: universal_gravitation
+
+- text: "Kinetic friction opposes the relative motion between two sliding surfaces and transforms mechanical energy into thermal energy."
+  expected_misconception_id: null
+  concept_id: friction_static_and_kinetic
+
+- text: "The normal force on a block resting on a ramp is equal to mg times the cosine of the inclination angle."
+  expected_misconception_id: null
+  concept_id: weight_and_normal_force
+
+- text: "Mechanical work done by a force on an object is zero if the object does not move any distance at all."
+  expected_misconception_id: null
+  concept_id: work_and_kinetic_energy
+
+- text: "Total momentum is conserved in both elastic and inelastic collisions as long as the system is closed and net external force is zero."
+  expected_misconception_id: null
+  concept_id: conservation_of_linear_momentum
+
+- text: "A free body diagram should only show external forces acting directly on the selected object, never internal forces."
+  expected_misconception_id: null
+  concept_id: free_body_diagrams
+
+- text: "At the peak of a vertical toss, the instantaneous velocity is zero but the acceleration is downward at 9.8 m/s^2."
+  expected_misconception_id: null
+  concept_id: acceleration
+
+# --- Positive Cases: Vectors in Physics ---
+- text: "I walked 6 kilometers west and then 8 kilometers south so my displacement is 14 kilometers."
+  expected_misconception_id: misc_vectors_scalar_addition
+  concept_id: vectors_in_physics
+
+- text: "To get the net force of two perpendicular forces just add their magnitudes directly like normal numbers."
+  expected_misconception_id: misc_vectors_scalar_addition
+
+# --- Positive Cases: Displacement & Velocity ---
+- text: "A velocity of 50 km/h is the exact same thing as saying a speed of 50 km/h, the direction doesn't matter at all."
+  expected_misconception_id: misc_velocity_is_speed
+  concept_id: displacement_and_velocity
+
+- text: "As long as the car's cruise control stays locked at 70, turning around a bend doesn't alter its velocity."
+  expected_misconception_id: misc_velocity_is_speed
+
+# --- Positive Cases: Acceleration ---
+- text: "When a tossed rock stops for a split second at its apex, its acceleration must be zero."
+  expected_misconception_id: misc_acceleration_same_as_velocity
+  concept_id: acceleration
+
+- text: "If an elevator stops at the fifth floor, both its speed and its acceleration are zero because acceleration is velocity."
+  expected_misconception_id: misc_acceleration_same_as_velocity
+
+# --- Positive Cases: Free Body Diagrams ---
+- text: "You must include the push of the tire on the asphalt on the car's free body diagram."
+  expected_misconception_id: misc_fbd_includes_internal_forces
+  concept_id: free_body_diagrams
+
+- text: "I drew the force the block exerts onto the table on the block's diagram."
+  expected_misconception_id: misc_fbd_includes_internal_forces
+
+# --- Positive Cases: Newton's First Law ---
+- text: "If the rocket runs out of fuel in interstellar space, it will gradually grind to a halt."
+  expected_misconception_id: misc_motion_requires_force
+  concept_id: newtons_first_law
+
+- text: "You have to keep applying a forward push otherwise the object naturally stops moving forward."
+  expected_misconception_id: misc_motion_requires_force
+
+- text: "A hockey puck sliding across frictionless ice will eventually stop because there is no force pushing it forward."
+  expected_misconception_id: misc_motion_requires_force
+
+- text: "To make a wagon move at steady speed you must apply a force greater than friction."
+  expected_misconception_id: misc_motion_requires_force
+
+# --- Positive Cases: Newton's Second Law ---
+- text: "The net force on the moving bullet must point in the direction of its trajectory."
+  expected_misconception_id: misc_net_force_in_direction_of_motion
+  concept_id: newtons_second_law
+
+- text: "If an object is moving to the left, the sum of all forces must be pointing to the left."
+  expected_misconception_id: misc_net_force_in_direction_of_motion
+
+- text: "When you brake hard, the net force must still point forward because the car continues moving forward."
+  expected_misconception_id: misc_net_force_in_direction_of_motion
+
+# --- Positive Cases: Newton's Third Law ---
+- text: "Since the baseball hits the bat with the same force the bat hits the ball, the forces cancel each other."
+  expected_misconception_id: misc_action_reaction_cancel
+  concept_id: newtons_third_law
+
+- text: "The donkey and wagon cannot move because the donkey's forward pull is canceled by the wagon's backward pull."
+  expected_misconception_id: misc_action_reaction_cancel
+
+- text: "Action and reaction forces act on the same body and balance out to zero."
+  expected_misconception_id: misc_action_reaction_cancel
+
+# --- Positive Cases: Weight & Normal Force ---
+- text: "The normal force supporting a box is always exactly mg no matter what angle the ramp is."
+  expected_misconception_id: misc_normal_force_equals_weight
+  concept_id: weight_and_normal_force
+
+- text: "A person in an accelerating elevator will see the scale read their normal weight mg."
+  expected_misconception_id: misc_normal_force_equals_weight
+
+# --- Positive Cases: Friction ---
+- text: "The ground can only slow runners down because friction is always opposite to the direction of travel."
+  expected_misconception_id: misc_friction_always_opposes_motion
+  concept_id: friction_static_and_kinetic
+
+- text: "Friction cannot push a car forward, friction only resists motion."
+  expected_misconception_id: misc_friction_always_opposes_motion
+
+# --- Positive Cases: Circular Motion ---
+- text: "When a car turns left, a mysterious centrifugal force pushes the passengers outward toward the right door."
+  expected_misconception_id: misc_centrifugal_force_is_real
+  concept_id: uniform_circular_motion
+
+- text: "Centrifugal force flings mud off a spinning bicycle tire straight outward."
+  expected_misconception_id: misc_centrifugal_force_is_real
+
+# --- Positive Cases: Gravitation ---
+- text: "A heavy bowling ball falls much faster than a light tennis ball because the heavier ball has more gravity."
+  expected_misconception_id: misc_heavier_objects_fall_faster
+  concept_id: universal_gravitation
+
+- text: "If you drop a hammer and a feather on the Moon, the hammer will hit first because it is heavier."
+  expected_misconception_id: misc_heavier_objects_fall_faster
+
+- text: "When you drop a rock, the Earth doesn't exert a force on it until it hits the ground."
+  expected_misconception_id: misc_heavier_objects_fall_faster
+
+# --- Positive Cases: Work & Kinetic Energy ---
+- text: "I got exhausted holding this 50-pound dumbbell stationary for 5 minutes, so I did a huge amount of work."
+  expected_misconception_id: misc_work_done_without_displacement
+  concept_id: work_and_kinetic_energy
+
+- text: "Even if the boulder didn't budge when I shoved it, I still did positive physical work on the boulder."
+  expected_misconception_id: misc_work_done_without_displacement
+
+# --- Positive Cases: Potential Energy ---
+- text: "The raised hammer contains potential energy inside itself without needing the Earth."
+  expected_misconception_id: misc_potential_energy_belongs_to_object
+  concept_id: potential_energy_and_conservation
+
+- text: "Potential energy belongs only to the brick on the roof, not to any system."
+  expected_misconception_id: misc_potential_energy_belongs_to_object
+
+# --- Positive Cases: Momentum & Impulse ---
+- text: "Momentum and kinetic energy are just two names for the same thing."
+  expected_misconception_id: misc_momentum_and_kinetic_energy_same
+  concept_id: linear_momentum_and_impulse
+
+- text: "If two objects have the same momentum they must have the exact same kinetic energy."
+  expected_misconception_id: misc_momentum_and_kinetic_energy_same
+
+# --- Positive Cases: Conservation of Momentum ---
+- text: "In a car crash where the cars crumple and lock together, momentum is not conserved."
+  expected_misconception_id: misc_conservation_momentum_elastic_only
+  concept_id: conservation_of_linear_momentum
+
+- text: "Inelastic collisions lose momentum because energy is lost as heat."
+  expected_misconception_id: misc_conservation_momentum_elastic_only

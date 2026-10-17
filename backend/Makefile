@@ -1,4 +1,4 @@
-.PHONY: up down lint format types test migrate migrate-down verify
+.PHONY: up down lint format types test migrate migrate-down content-validate content-sync eval-retrieval verify
 
 up:
 	docker compose up -d postgres redis
@@ -26,5 +26,16 @@ migrate:
 migrate-down:
 	uv run alembic downgrade base
 
+content-validate:
+	uv run python -m app.content.cli validate --strict
+
+content-sync:
+	uv run python -m app.content.cli sync
+
+eval-retrieval:
+	uv run python evals/run_retrieval_eval.py --embedder fake
+
 verify: lint types test
 	uv run python -m scripts.verify_migrations
+	$(MAKE) content-validate
+	$(MAKE) eval-retrieval

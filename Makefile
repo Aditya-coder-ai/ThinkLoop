@@ -1,4 +1,4 @@
-.PHONY: up down lint format types test migrate migrate-down verify
+.PHONY: up down lint format types test migrate migrate-down content-validate content-sync eval-retrieval verify
 
 up:
 	$(MAKE) -C backend up
@@ -23,6 +23,15 @@ migrate:
 
 migrate-down:
 	$(MAKE) -C backend migrate-down
+
+content-validate:
+	$(MAKE) -C backend content-validate
+
+content-sync:
+	$(MAKE) -C backend content-sync
+
+eval-retrieval:
+	$(MAKE) -C backend eval-retrieval
 
 verify:
 	$(MAKE) -C backend verify

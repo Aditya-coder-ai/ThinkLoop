@@ -1,0 +1,111 @@
+# Newtonian Mechanics Concept Inventory
+# Source: PER (Physics Education Research) curriculum alignment
+
+- id: vectors_in_physics
+  title: "Vectors in Physics"
+  description: "Vectors possess both magnitude and direction, providing the essential mathematical foundation for kinematics and dynamics in two and three dimensions."
+  prerequisites: []
+  difficulty: 1
+
+- id: displacement_and_velocity
+  title: "Displacement and Velocity"
+  description: "Position, displacement, speed, and velocity describe how an object's location changes continuously over time in one or more spatial dimensions."
+  prerequisites:
+    - vectors_in_physics
+  difficulty: 1
+
+- id: acceleration
+  title: "Acceleration"
+  description: "Acceleration quantifies the rate of change of velocity with respect to time, encompassing speeding up, slowing down, or changing direction."
+  prerequisites:
+    - displacement_and_velocity
+  difficulty: 2
+
+- id: free_body_diagrams
+  title: "Free-Body Diagrams"
+  description: "Free-body diagrams isolate a system to visually represent all external contact and field forces acting upon it with proper vector arrows."
+  prerequisites:
+    - vectors_in_physics
+  difficulty: 2
+
+- id: newtons_first_law
+  title: "Newton's First Law (Inertia)"
+  description: "An object maintains a constant state of rest or uniform straight-line motion unless acted upon by a non-zero net external force."
+  prerequisites:
+    - acceleration
+    - free_body_diagrams
+  difficulty: 2
+
+- id: newtons_second_law
+  title: "Newton's Second Law"
+  description: "The net external force on an object equals the product of its mass and acceleration vector, mathematically expressed as F_net equals m times a."
+  prerequisites:
+    - newtons_first_law
+  difficulty: 2
+
+- id: newtons_third_law
+  title: "Newton's Third Law (Action-Reaction)"
+  description: "When two bodies interact, they apply forces on one another that are equal in magnitude, opposite in direction, and act on different objects simultaneously."
+  prerequisites:
+    - newtons_second_law
+  difficulty: 2
+
+- id: weight_and_normal_force
+  title: "Weight and Normal Force"
+  description: "Weight is the downward gravitational pull on an object near Earth's surface, while the normal force is the perpendicular contact support from a surface."
+  prerequisites:
+    - newtons_third_law
+  difficulty: 2
+
+- id: friction_static_and_kinetic
+  title: "Static and Kinetic Friction"
+  # REVIEW: Verify whether rolling friction and lubricated boundary conditions should be mentioned in this introductory scope.
+  description: "Friction resists the relative sliding motion between contacting surfaces, with static friction preventing initial motion and kinetic friction opposing ongoing slide."
+  prerequisites:
+    - weight_and_normal_force
+  difficulty: 3
+
+- id: uniform_circular_motion
+  title: "Uniform Circular Motion and Centripetal Acceleration"
+  description: "Objects moving along a circular path at constant speed experience a centripetal acceleration directed inward toward the center due to a net radial force."
+  prerequisites:
+    - newtons_second_law
+  difficulty: 3
+
+- id: universal_gravitation
+  title: "Newton's Law of Universal Gravitation"
+  # REVIEW: Domain expert to confirm if spherical shell theorem derivations should be introduced as a separate advanced concept.
+  description: "Every point mass attracts every other point mass with a force directly proportional to the product of their masses and inversely proportional to distance squared."
+  prerequisites:
+    - newtons_second_law
+  difficulty: 3
+
+- id: work_and_kinetic_energy
+  title: "Work and Kinetic Energy"
+  description: "Mechanical work done by a net force equals the dot product of force and displacement, leading to changes in the object's translational kinetic energy."
+  prerequisites:
+    - newtons_second_law
+  difficulty: 3
+
+- id: potential_energy_and_conservation
+  title: "Potential Energy and Conservation of Mechanical Energy"
+  description: "Conservative forces such as gravity and ideal springs store potential energy, allowing mechanical energy to be conserved in isolated frictionless systems."
+  prerequisites:
+    - work_and_kinetic_energy
+  difficulty: 4
+
+- id: linear_momentum_and_impulse
+  title: "Linear Momentum and Impulse"
+  description: "Linear momentum is the product of mass and velocity, and impulse is the integral of net force over time, producing an identical change in linear momentum."
+  prerequisites:
+    - newtons_second_law
+  difficulty: 3
+
+- id: conservation_of_linear_momentum
+  title: "Conservation of Linear Momentum"
+  # REVIEW: Confirm standard treatment of center-of-mass frame for two-dimensional oblique collisions before deployment.
+  description: "In an isolated physical system where external forces sum to zero, the total vector momentum before an interaction equals total momentum afterward."
+  prerequisites:
+    - linear_momentum_and_impulse
+    - newtons_third_law
+  difficulty: 4

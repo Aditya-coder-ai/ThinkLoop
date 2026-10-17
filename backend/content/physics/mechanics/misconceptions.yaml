@@ -1,0 +1,170 @@
+# Newtonian Mechanics Misconceptions Inventory
+# Sourced from Physics Education Research (PER) literature (Halloun & Hestenes, McDermott, Clement, etc.)
+
+- id: misc_vectors_scalar_addition
+  concept_id: vectors_in_physics
+  statement: "I can find the resultant of two vectors by simply adding their numerical magnitudes together."
+  correct_idea: "Vectors must be added by decomposing them into orthogonal components or using vector geometry, taking full account of directional angles."
+  conflict_prompt: "Predict the magnitude of the displacement if a student walks 3 meters north and then 4 meters east."
+  example_utterances:
+    - "If I walk 3 meters north and 4 meters east my total displacement is 7 meters."
+    - "Adding vectors is just adding their numerical lengths."
+    - "Two force vectors of 5 Newtons and 5 Newtons always make 10 Newtons."
+  evidence: "Flores-Camacho et al., Physics Education Research on vector representation difficulties"
+
+- id: misc_velocity_is_speed
+  concept_id: displacement_and_velocity
+  statement: "Velocity is just another word for speed and doesn't depend on which way an object travels."
+  correct_idea: "Speed is a scalar measuring rate of distance traveled, while velocity is a vector that strictly includes directional orientation."
+  conflict_prompt: "Predict the average velocity of a runner who completes a 400-meter circular lap in 50 seconds and returns to the exact starting line."
+  example_utterances:
+    - "Velocity and speed mean the exact same thing."
+    - "A car going in a circle at 60 mph has constant velocity."
+    - "Direction does not change velocity if the speedometer needle stays fixed."
+  evidence: "Trowbridge & McDermott (1980), Investigation of student understanding of velocity in one dimension"
+
+- id: misc_acceleration_same_as_velocity
+  concept_id: acceleration
+  statement: "Velocity and acceleration are basically the same thing, so zero velocity must mean zero acceleration."
+  correct_idea: "Velocity describes the current state of motion, whereas acceleration describes how that velocity is changing over time."
+  conflict_prompt: "Predict the acceleration of a ball thrown straight upward at the exact instant it reaches its peak height."
+  example_utterances:
+    - "At the top of its flight the ball stops moving, so its acceleration is zero."
+    - "Velocity and acceleration are identical concepts."
+    - "An object with zero instantaneous speed cannot have an acceleration at that instant."
+  evidence: "Trowbridge & McDermott (1981), Investigation of student understanding of acceleration in one dimension"
+
+- id: misc_fbd_includes_internal_forces
+  concept_id: free_body_diagrams
+  statement: "A free-body diagram should show the forces that the object exerts on its surroundings."
+  correct_idea: "A free-body diagram isolates the system and displays only external forces acting ON the object, never forces exerted BY the object."
+  conflict_prompt: "Predict whether a book's downward push on a table should be drawn on the free-body diagram of the book."
+  example_utterances:
+    - "Draw the force of the box pushing against the floor on the box diagram."
+    - "Internal forces exerted by the body must be included on its free body diagram."
+    - "A free body diagram includes all forces the object puts on the surroundings."
+  evidence: "Rosengrant, Etkina, & Van Heuvelen (2009), Do students use and understand free-body diagrams?"
+
+- id: misc_motion_requires_force
+  concept_id: newtons_first_law
+  statement: "An object needs a continuous forward force acting on it to keep moving at a constant speed."
+  correct_idea: "By Newton's first law, an object in motion continues with constant velocity unless a net external force opposes it; friction slows objects down on Earth."
+  conflict_prompt: "Predict what will happen to a spacecraft drifting in deep space after its engines are completely turned off."
+  example_utterances:
+    - "Without an engine push, any moving object will naturally slow down to a stop in space."
+    - "Continuous motion requires a continuing force."
+    - "If you stop applying a force, the object stops moving immediately."
+  evidence: "Halloun & Hestenes (1985), Common sense concepts about motion, American Journal of Physics"
+
+- id: misc_net_force_in_direction_of_motion
+  concept_id: newtons_second_law
+  statement: "The net force on an object must always point in the direction the object is traveling."
+  correct_idea: "Net force determines the direction of acceleration, which can oppose or be perpendicular to the instantaneous velocity."
+  conflict_prompt: "Predict the direction of the net force acting on a car that is moving forward while slamming on its brakes."
+  example_utterances:
+    - "Because the car moves forward, the net force must point forward."
+    - "Force is always in the same direction as the object's velocity."
+    - "Things only move in the direction that net force pushes them."
+  evidence: "Clement (1982), Students' preconceptions in introductory mechanics"
+
+- id: misc_action_reaction_cancel
+  concept_id: newtons_third_law
+  statement: "Newton's third law action-reaction forces act on the same object and cancel each other out."
+  correct_idea: "Action and reaction forces act on two completely different objects, so they never cancel each other out when considering the acceleration of a single object."
+  conflict_prompt: "Predict whether a horse can pull a cart forward if the cart pulls backward on the horse with an equal force."
+  example_utterances:
+    - "Action and reaction forces cancel out, so nothing can ever accelerate."
+    - "The cart pulls back on the horse with equal force, so the forces cancel."
+    - "Third law pairs apply to the same body."
+  evidence: "Brown (1989), Overcoming misconceptions via analogical reasoning: abstract transfer, Journal of Research in Science Teaching"
+
+- id: misc_normal_force_equals_weight
+  concept_id: weight_and_normal_force
+  # REVIEW: Expert review recommended for incline and banked curve instructional scaffolding.
+  statement: "The normal force on an object is always exactly equal to its weight."
+  correct_idea: "Normal force is an elastic surface constraint force that adjusts to balance all perpendicular forces, and is not inherently equal to mg (e.g. on inclines or under vertical acceleration)."
+  conflict_prompt: "Predict the normal force reading on a bathroom scale supporting a person standing inside an elevator accelerating upward."
+  example_utterances:
+    - "Normal force is always equal and opposite to weight mg."
+    - "The scale will always read exactly your weight regardless of whether the elevator accelerates."
+    - "A block on an incline has normal force equal to mg."
+  evidence: "Minstrell (1982), Explaining the 'at rest' condition of an object, The Physics Teacher"
+
+- id: misc_friction_always_opposes_motion
+  concept_id: friction_static_and_kinetic
+  statement: "Friction always opposes the overall motion of an object and can never cause something to speed up."
+  correct_idea: "Friction opposes relative sliding between contacting surfaces; static friction between feet or tires and the ground accelerates runners and cars forward."
+  conflict_prompt: "Predict the direction of the friction force exerted by the ground on the sneakers of a sprinter starting a race."
+  example_utterances:
+    - "Friction always slows things down, it can never propel an object forward."
+    - "Friction can never act in the direction an object is accelerating."
+    - "The road applies backward friction on the tires of an accelerating car."
+  evidence: "Besson et al. (2007), Students' understanding of friction: An epistemological analysis"
+
+- id: misc_centrifugal_force_is_real
+  concept_id: uniform_circular_motion
+  # REVIEW: Verify whether non-inertial frame treatment should be noted as an advanced topic extension.
+  statement: "An outward centrifugal force physically pushes rotating objects away from the center of curvature."
+  correct_idea: "In an inertial reference frame, there is only an inward centripetal force; the sensation of being thrown outward is inertia resisting a change in velocity."
+  conflict_prompt: "Predict the path of a ball on a cut string spinning horizontally in a circle at the instant the string snaps."
+  example_utterances:
+    - "When the string breaks, the ball flies directly radially outward due to centrifugal force."
+    - "A real centrifugal force pushes you into the car door when making a sharp turn."
+    - "Circular motion has an outward force balancing the inward force."
+  evidence: "Peters (1982), Inertial and non-inertial frames and student difficulties with circular motion"
+
+- id: misc_heavier_objects_fall_faster
+  concept_id: universal_gravitation
+  statement: "Heavier objects naturally fall significantly faster in free fall because gravity pulls on them with more force."
+  correct_idea: "While gravitational force is proportional to mass (F = mg), inertial resistance to acceleration is also proportional to mass (a = F/m), resulting in the same gravitational acceleration g for all objects in vacuum."
+  conflict_prompt: "Predict which object will hit the ground first when a 1 kg steel ball and a 10 kg cannonball are dropped simultaneously in a vacuum chamber."
+  example_utterances:
+    - "Heavier objects fall faster than light objects because gravity pulls harder."
+    - "A 10 kg cannonball falls ten times faster than a 1 kg ball."
+    - "Weight determines how fast things drop in free fall."
+  evidence: "Galileo Galilei (1638); Halloun & Hestenes (1985) Force Concept Inventory baseline"
+
+- id: misc_work_done_without_displacement
+  concept_id: work_and_kinetic_energy
+  statement: "If I exert great effort pushing against a massive wall until I am exhausted, I have done mechanical work on the wall."
+  correct_idea: "Work in physics requires both a force and a non-zero displacement in the direction of that force (W = F * d * cos(theta))."
+  conflict_prompt: "Predict whether mechanical work is done on a brick wall when a person pushes against it with 500 N of force for one hour without the wall moving."
+  example_utterances:
+    - "Pushing hard on a stationary wall does work because you get tired."
+    - "Holding a heavy barbell motionless overhead does work on the barbell."
+    - "Exerting a force always means doing mechanical work."
+  evidence: "Lawson & McDermott (1987), Student understanding of the work-energy and impulse-momentum theorems"
+
+- id: misc_potential_energy_belongs_to_object
+  concept_id: potential_energy_and_conservation
+  # REVIEW: Domain expert to confirm wording on field vs system boundary semantics.
+  statement: "Gravitational potential energy is stored entirely inside the elevated object itself rather than in the gravitational field of the system."
+  correct_idea: "Potential energy is a property of a system of interacting bodies (such as the object and the Earth together) via conservative forces."
+  conflict_prompt: "Predict what happens to gravitational potential energy if the Earth were removed while an object remained at its elevated position."
+  example_utterances:
+    - "The raised bowling ball holds all the potential energy within itself."
+    - "Potential energy is an intrinsic property of a single isolated object."
+    - "An object possesses potential energy without interacting with anything else."
+  evidence: "Chabay & Sherwood (2006), Matter and Interactions: System boundaries and potential energy"
+
+- id: misc_momentum_and_kinetic_energy_same
+  concept_id: linear_momentum_and_impulse
+  statement: "Momentum and kinetic energy are interchangeable measures of an object's motion."
+  correct_idea: "Momentum is a vector quantity proportional to velocity (p = mv), whereas kinetic energy is a scalar quantity proportional to the square of speed (KE = 0.5 * m * v^2)."
+  conflict_prompt: "Predict the total momentum and kinetic energy of two identical carts moving toward each other at identical speeds."
+  example_utterances:
+    - "Momentum and kinetic energy measure the exact same thing."
+    - "If two carts have equal momentum they must have equal kinetic energy."
+    - "Momentum is just another word for energy of motion."
+  evidence: "Pride, Vokos, & McDermott (1998), Cultivating student understanding of the distinction between momentum and energy"
+
+- id: misc_conservation_momentum_elastic_only
+  concept_id: conservation_of_linear_momentum
+  statement: "Momentum is only conserved in elastic collisions where no kinetic energy is lost."
+  correct_idea: "Total momentum is conserved in all isolated collisions (elastic and inelastic) as long as net external forces are zero; only kinetic energy is lost in inelastic collisions."
+  conflict_prompt: "Predict whether the total vector momentum before collision equals total vector momentum after two clay balls collide and stick together in midair."
+  example_utterances:
+    - "Momentum is lost when two objects stick together in a crash."
+    - "Conservation of momentum only works for bouncy elastic collisions."
+    - "Sticky collisions do not conserve momentum."
+  evidence: "Singh & Rosengrant (2003), Students' conceptual difficulties with energy and momentum in one dimension"

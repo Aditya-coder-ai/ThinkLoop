@@ -1,0 +1,205 @@
+# Newtonian Mechanics Problems Inventory
+# Covers numeric, symbolic, and multiple_choice problems across concepts
+
+- id: prob_vectors_components
+  concept_id: vectors_in_physics
+  statement: "A displacement vector has a magnitude of 10.0 meters and points at an angle of 30.0 degrees above the positive x-axis. Calculate the x-component of this vector in meters."
+  difficulty: 1
+  answer_spec:
+    kind: numeric
+    numeric:
+      value: 8.66
+      unit: "m"
+      tolerance: 0.02
+
+- id: prob_displacement_roundtrip
+  concept_id: displacement_and_velocity
+  statement: "A runner completes one full 400-meter circular lap on a track in 80 seconds, returning to the exact starting line. What is the magnitude of the runner's average velocity for the entire trip?"
+  difficulty: 1
+  answer_spec:
+    kind: multiple_choice
+    multiple_choice:
+      options:
+        - "0 m/s"
+        - "5.0 m/s"
+        - "400 m/s"
+        - "0.2 m/s"
+      correct_index: 0
+
+- id: prob_constant_acceleration
+  concept_id: acceleration
+  statement: "A car accelerates uniformly along a straight highway from rest to a speed of 20.0 m/s in 5.0 seconds. What is the magnitude of its acceleration in m/s^2?"
+  difficulty: 2
+  answer_spec:
+    kind: numeric
+    numeric:
+      value: 4.0
+      unit: "m/s^2"
+      tolerance: 0.01
+
+- id: prob_fbd_book_table
+  concept_id: free_body_diagrams
+  statement: "A physics textbook rests stationary on a flat horizontal table. Which forces must appear on the free-body diagram of the book?"
+  difficulty: 2
+  answer_spec:
+    kind: multiple_choice
+    multiple_choice:
+      options:
+        - "Downward gravitational force from Earth and upward normal force from table"
+        - "Downward gravity, upward normal force, and downward push of the book on the table"
+        - "Upward normal force only"
+        - "No forces act because the book is not moving"
+      correct_index: 0
+
+- id: prob_newton_first_spacecraft
+  concept_id: newtons_first_law
+  statement: "A deep-space probe with a mass of 500 kg coasts at 1200 m/s far from any gravitational source with its engines powered off. What net external force is needed to maintain this speed?"
+  difficulty: 1
+  answer_spec:
+    kind: multiple_choice
+    multiple_choice:
+      options:
+        - "0 N"
+        - "600 N"
+        - "1200 N"
+        - "600000 N"
+      correct_index: 0
+
+- id: prob_newton_second_force
+  concept_id: newtons_second_law
+  statement: "What net horizontal force in Newtons is required to accelerate a 12.0 kg sled at 2.5 m/s^2 across a frictionless frozen lake?"
+  difficulty: 2
+  answer_spec:
+    kind: numeric
+    numeric:
+      value: 30.0
+      unit: "N"
+      tolerance: 0.01
+
+- id: prob_newton_second_symbolic
+  concept_id: newtons_second_law
+  statement: "Express the magnitude of the acceleration 'a' of an object of mass 'm' subjected to a net external force 'F' in terms of F and m."
+  difficulty: 2
+  answer_spec:
+    kind: symbolic
+    symbolic:
+      expression: "F / m"
+
+- id: prob_newton_third_earth_apple
+  concept_id: newtons_third_law
+  statement: "An apple of mass 0.2 kg falls toward the Earth due to gravity. How does the magnitude of the gravitational force exerted by the apple on the Earth compare to the force exerted by the Earth on the apple?"
+  difficulty: 2
+  answer_spec:
+    kind: multiple_choice
+    multiple_choice:
+      options:
+        - "They are exactly equal in magnitude"
+        - "The Earth exerts a much larger force because of its greater mass"
+        - "The apple exerts zero force on the Earth"
+        - "The forces depend on the velocity of the falling apple"
+      correct_index: 0
+
+- id: prob_normal_force_incline
+  concept_id: weight_and_normal_force
+  statement: "For a block of mass 'm' resting on a frictionless incline inclined at angle 'theta' above the horizontal, express the magnitude of the normal force 'N' in terms of m, g, and theta."
+  difficulty: 3
+  answer_spec:
+    kind: symbolic
+    symbolic:
+      expression: "m * g * cos(theta)"
+
+- id: prob_kinetic_friction_calc
+  concept_id: friction_static_and_kinetic
+  statement: "A 5.0 kg crate slides across a horizontal concrete floor where the coefficient of kinetic friction is 0.20. Taking g = 9.8 m/s^2, what is the magnitude of the kinetic friction force in Newtons?"
+  difficulty: 3
+  answer_spec:
+    kind: numeric
+    numeric:
+      value: 9.8
+      unit: "N"
+      tolerance: 0.02
+
+- id: prob_centripetal_acceleration
+  concept_id: uniform_circular_motion
+  statement: "A racecar navigates a flat circular track of radius 50.0 meters at a constant speed of 10.0 m/s. What is the magnitude of its centripetal acceleration in m/s^2?"
+  difficulty: 3
+  answer_spec:
+    kind: numeric
+    numeric:
+      value: 2.0
+      unit: "m/s^2"
+      tolerance: 0.01
+
+- id: prob_centripetal_force_symbolic
+  concept_id: uniform_circular_motion
+  statement: "Write the algebraic expression for the required centripetal net force 'F_c' acting on an object of mass 'm' moving at speed 'v' in a circle of radius 'r'."
+  difficulty: 3
+  answer_spec:
+    kind: symbolic
+    symbolic:
+      expression: "m * v**2 / r"
+
+- id: prob_universal_gravitation_symbolic
+  concept_id: universal_gravitation
+  statement: "Express Newton's law of universal gravitation for the force 'F' between two masses 'm1' and 'm2' separated by a distance 'r', using gravitational constant 'G'."
+  difficulty: 3
+  answer_spec:
+    kind: symbolic
+    symbolic:
+      expression: "G * m1 * m2 / r**2"
+
+- id: prob_work_horizontal_force
+  concept_id: work_and_kinetic_energy
+  statement: "A shopper pushes a cart with a steady horizontal force of 25.0 N over a distance of 12.0 meters along a supermarket aisle. How much work in Joules is performed on the cart?"
+  difficulty: 2
+  answer_spec:
+    kind: numeric
+    numeric:
+      value: 300.0
+      unit: "J"
+      tolerance: 0.01
+
+- id: prob_kinetic_energy_symbolic
+  concept_id: work_and_kinetic_energy
+  statement: "Write the formula for the translational kinetic energy 'K' of an object of mass 'm' moving at speed 'v'."
+  difficulty: 2
+  answer_spec:
+    kind: symbolic
+    symbolic:
+      expression: "1/2 * m * v**2"
+
+- id: prob_gravitational_potential_energy
+  concept_id: potential_energy_and_conservation
+  statement: "A 2.0 kg physics textbook is lifted vertically from the floor to a bookshelf 1.5 meters above the floor. Taking g = 9.8 m/s^2, what is the increase in gravitational potential energy in Joules?"
+  difficulty: 2
+  answer_spec:
+    kind: numeric
+    numeric:
+      value: 29.4
+      unit: "J"
+      tolerance: 0.02
+
+- id: prob_momentum_magnitude
+  concept_id: linear_momentum_and_impulse
+  statement: "What is the magnitude of the linear momentum in kg*m/s of an 80.0 kg athlete sprinting with a velocity of 9.0 m/s?"
+  difficulty: 2
+  answer_spec:
+    kind: numeric
+    numeric:
+      value: 720.0
+      unit: "kg*m/s"
+      tolerance: 0.01
+
+- id: prob_conservation_momentum_recoil
+  concept_id: conservation_of_linear_momentum
+  statement: "Two ice skaters initially at rest push away from each other on frictionless ice. Skater A has mass 50 kg and Skater B has mass 100 kg. How do their speeds compare right after separating?"
+  difficulty: 3
+  answer_spec:
+    kind: multiple_choice
+    multiple_choice:
+      options:
+        - "Skater A moves twice as fast as Skater B"
+        - "Skater B moves twice as fast as Skater A"
+        - "Both move at the exact same speed"
+        - "Neither skater moves"
+      correct_index: 0

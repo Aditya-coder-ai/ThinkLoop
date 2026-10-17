@@ -1,6 +1,10 @@
 # Progress & Implementation Record
 
-## Status: Part 1 (Foundation) Complete
+## Status: Part 1 (Foundation) & Part 2 (Content System) Complete
+
+---
+
+## Part 1: Foundation Summary
 
 ### What Was Built
 1. **Verification Harness & Tooling**:
@@ -25,7 +29,6 @@
    - `app/db/models.py`: `User` model with UUID primary key, unique indexed `auth_id`, nullable `email`, and timezone-aware timestamps.
    - `app/db/session.py`: Asynchronous engine creation (`asyncpg`) and async session maker.
    - `app/db/migrations/`: Alembic environment (`alembic.ini`, `env.py`) supporting async migrations, and initial migration `0001_initial_users_and_vector.py` enabling PostgreSQL `vector` extension and creating `users` table.
-   - Verified clean upgrade to `head` and downgrade to `base`.
 
 5. **Security & Pluggable Authentication**:
    - `app/core/security.py`: RS256 JWKS public key cache service (`JWKSService`). Caches keys with configurable TTL, refetches keys once upon encountering an unknown `kid` (supporting key rotation), and validates JWT signature, expiration (`exp`), issuer (`iss`), and audience (`aud`). Pluggable for Auth0, Clerk, or Supabase.
@@ -45,39 +48,127 @@
 
 ---
 
-### Assumptions
-1. **JWKS Token Claims**: Auth provider tokens supply `sub` (or `user_id` / `custom:auth_id`) as the primary identity claim (`auth_id`), and optional `email` claim.
-2. **Race-Safe Provisioning**: In high-concurrency environments, user creation utilizes PostgreSQL `ON CONFLICT (auth_id) DO UPDATE` to eliminate duplicate key race conditions across parallel requests.
-3. **Hermetic Test Suite**:
-   - `tests/conftest.py` uses local RSA 2048-bit keypair generation and mock JWKS endpoints. No external network calls are made during tests.
-   - In-memory SQLite (`sqlite+aiosqlite`) and `fakeredis` are used in test runners to guarantee fast, deterministic tests without requiring local background daemons. Real PostgreSQL 16 + pgvector and Redis are exercised in CI service containers.
+## Part 2: Content System & Knowledge Graph
+
+### What Was Built
+1. **Strict YAML Content Schemas (`app/content/schemas.py`)**:
+   - Pydantic v2 schemas configured with `extra="forbid"`:
+     - `TopicSchema`: `schema_version`, `domain`, `topic`, `title`.
+     - `ConceptSchema`: `id` (snake_case regex), `title`, `description` (min 40 chars), `prerequisites`, `difficulty` (1-5).
+     - `MisconceptionSchema`: `id`, `concept_id`, `statement`, `correct_idea`, `conflict_prompt`, `example_utterances` (min 3), `evidence`.
+     - `ProblemSchema`: `id`, `concept_id`, `statement`, `answer_spec`, `difficulty` (1-5).
+     - `AnswerSpec`: Discriminated union supporting `numeric` (value, unit, tolerance), `symbolic` (expression), and `multiple_choice` (options >= 2, correct_index in range).
+
+2. **Multi-Error Content & Graph Validator (`app/content/validator.py`)**:
+   - Complete multi-file validation engine accumulating all errors across YAML files in a single pass before failing.
+   - Graph validation using `networkx`: detects cycles, extracts exact cycle paths (e.g. `a -> b -> c -> a`), rejects self-prerequisites.
+   - Mathematical expression validation using `sympy.sympify`: rejects invalid mathematical syntax.
+   - Checks referential integrity across concepts, prerequisites, misconceptions, and problems.
+   - Soft warnings for orphaned concepts (in multi-concept topics), duplicate example utterances, and concepts with 0 misconceptions or 0 problems.
+   - CLI support for `--strict` elevating warnings to errors.
+
+3. **Pluggable Embedder Protocol (`app/content/embedder.py`)**:
+   - `Embedder` protocol: `async def embed(texts: list[str]) -> list[list[float]]`.
+   - `FakeEmbedder`: Fast, deterministic hash-based unit-norm vector generator sized to `EMBEDDING_DIM` (default 1024), used in all tests and CI without external network access.
+   - `HttpEmbedder`: Production-ready async client calling configurable embeddings API endpoints with timeout and exponential backoff retry handling.
+
+4. **Database Models & Alembic Migration (`app/db/models.py`, `0002_content_tables_and_vectors.py`)**:
+   - Models: `Concept`, `ConceptEdge`, `Misconception`, `Problem`.
+   - Audit columns: `created_at`, `updated_at`, `is_active`, `content_hash`, `schema_version`.
+   - `pgvector` `Vector(dim)` columns for concepts and misconceptions with HNSW index (`vector_cosine_ops`) for high-performance approximate nearest neighbor retrieval.
+   - Fully reversible migration supporting clean `upgrade head` and `downgrade base`.
+
+5. **Transactional & Idempotent Content Loader (`app/content/loader.py`)**:
+   - Atomic database synchronization inside an async transaction; mid-sync embedder or DB failures trigger complete rollback.
+   - Content-hash diffing prevents duplicate embedding computations and preserves `updated_at` timestamps on unchanged rows.
+   - Idempotent: Consecutive syncs on identical files yield 0 created, 0 updated, and 0 soft-deleted.
+   - Soft-delete semantics: Rows removed from YAML are marked `is_active=False` rather than hard deleted, preserving learner history for downstream parts.
+   - `--dry-run` flag prints planned mutations without modifying the database.
+
+6. **Graph Service & Semantic Retrieval Service (`app/content/service.py`, `app/content/retrieval.py`)**:
+   - `GraphService`: Transitive and depth-bounded prerequisite traversals, dependents lookup, topological `learning_path` generation, and React Flow-compatible graph representation (`{nodes, edges}`). Hardened with cycle detection to prevent infinite loops.
+   - `RetrievalService`: Cosine similarity vector search over active items for misconceptions and concepts. Supports `include_prereqs=True` to include direct prerequisites' misconceptions in matching. Empty/whitespace queries return `[]`.
+
+7. **Authenticated Content API Endpoints (`app/api/concepts.py`)**:
+   - `GET /concepts`: Filterable by domain and topic.
+   - `GET /concepts/{id}`: Detailed concept view including prerequisites and misconceptions.
+   - `GET /topics/{topic}/graph`: Full topic prerequisite graph formatted for React Flow.
+   - `GET /concepts/{id}/path`: Topologically sorted prerequisite learning path.
+   - `GET /problems`: Filterable by `concept_id`.
+   - **Critical Security Invariant**: `answer_spec` is stripped completely from all learner-facing `/problems` responses (verified by tests on raw JSON).
+   - Inactive or non-existent items consistently return 404 in the standard error envelope.
+
+8. **Newtonian Mechanics Seed Content (`content/physics/mechanics/`)**:
+   - 15 concepts in an acyclic prerequisite DAG (vectors, kinematics, Newton's 1st/2nd/3rd laws, friction, universal gravitation, circular motion, work, kinetic/potential energy, momentum).
+   - 15 misconceptions grounded in Physics Education Research (PER) literature, each featuring >=3 realistic student utterances and a prediction-style conflict prompt.
+   - 18 problems covering numeric, symbolic (SymPy verified), and multiple choice modalities.
+   - Annotated with `# REVIEW` comments for domain expert review.
+
+9. **Retrieval Evaluation Harness (`evals/retrieval_cases.yaml`, `evals/run_retrieval_eval.py`)**:
+   - 45 labeled test cases (35 positive queries with expected misconceptions, 10 negative control queries).
+   - Computes Recall@3, Recall@5, MRR, and negative False-Positive Rate against configurable thresholds.
+   - Supports `--embedder fake` (deterministic harness wiring check for CI) and `--embedder http` (semantic quality gate with live credentials).
+
+10. **Developer CLI & Educator Guide (`app/content/cli.py`, `docs/content-authoring.md`)**:
+    - Typer CLI with `validate`, `sync`, `stats`, and `eval-retrieval` commands.
+    - Comprehensive authoring documentation guiding teachers on YAML syntax, schema rules, conflict prompt design, and local validation.
+
+---
+
+### Part 2 Assumptions
+1. **Prerequisite Edge Orientation**: In `concept_edges`, `source_id` is the prerequisite concept and `target_id` is the dependent concept (`source -> target`). In the React Flow graph response, edges map `{"source": prereq_id, "target": concept_id}`.
+2. **Embedding Content Concatenation**:
+   - Concepts: `f"{title}\n\n{description}"`
+   - Misconceptions: `f"{statement}\n\n" + "\n".join(example_utterances)`
+3. **Soft-Delete Guarantee**: Removed YAML items have `is_active` set to `False` in PostgreSQL to preserve referential integrity for future learner performance records.
+4. **Hermetic Test Harness**: All unit and integration tests use `FakeEmbedder` to eliminate external network dependencies.
+
+---
+
+### `# REVIEW` Seed Content Items (Awaiting Expert Review)
+1. `content/physics/mechanics/concepts.yaml:L62`:
+   - Concept: `friction`
+   - Note: Verify whether rolling friction and lubricated boundary conditions should be mentioned in this introductory scope.
+2. `content/physics/mechanics/concepts.yaml:L77`:
+   - Concept: `universal_gravitation`
+   - Note: Domain expert to confirm if spherical shell theorem derivations should be introduced as a separate advanced concept.
+3. `content/physics/mechanics/concepts.yaml:L106`:
+   - Concept: `momentum_and_impulse`
+   - Note: Confirm standard treatment of center-of-mass frame for two-dimensional oblique collisions before deployment.
+4. `content/physics/mechanics/misconceptions.yaml:L83`:
+   - Misconception: `friction_opposes_motion`
+   - Note: Expert review recommended for incline and banked curve instructional scaffolding.
+5. `content/physics/mechanics/misconceptions.yaml:L106`:
+   - Misconception: `centrifugal_force_is_real`
+   - Note: Verify whether non-inertial frame treatment should be noted as an advanced topic extension.
+6. `content/physics/mechanics/misconceptions.yaml:L140`:
+   - Misconception: `potential_energy_resides_in_object`
+   - Note: Domain expert to confirm wording on field vs system boundary semantics.
 
 ---
 
 ### Dependencies Rationale
-1. `aiosqlite`: Added to dev dependencies to enable async SQLite dialect testing without requiring an external database server on developer workstations.
-2. `fakeredis[lua]`: Added to dev dependencies to enable full Redis sorted set and pipeline testing in memory hermetically.
-3. `types-redis`: Added to dev dependencies for strict mypy typing support with Redis.
+1. `pyyaml`: Required for safe parsing of versioned Git curriculum files (`yaml.safe_load`).
+2. `pgvector`: Official PostgreSQL vector extension client library for SQLAlchemy async ORM.
+3. `networkx`: Graph algorithms used strictly in the content loader and validator to ensure prerequisite DAG invariants and format React Flow graph exports.
+4. `sympy`: Pure-Python symbolic mathematics library for validating mathematical syntax and formulas in `symbolic` problem specifications.
+5. `typer`: Modern typed command-line framework for content validation, database synchronization, repository statistics, and retrieval evaluation.
 
 ---
 
 ### Known Limitations
-1. **Unauthenticated Rate Limiting by IP**: In production environments behind reverse proxies or load balancers, rate limiting by IP requires configuring trusted proxy headers (`X-Forwarded-For`).
-2. **Single-Region Redis**: Rate limiter uses Redis sorted sets in a single cluster/instance. Multi-region latency will require local Redis caches or token bucket algorithms.
-3. **Database Dialect in Migrations**: The `0001_initial_users_and_vector.py` migration includes conditional logic for `CREATE EXTENSION IF NOT EXISTS vector` to allow running both on PostgreSQL and SQLite.
+1. **FakeEmbedder in Local Development**: `FakeEmbedder` generates deterministic hash vectors for hermetic CI and test runs. Realistic semantic similarity retrieval requires running with `HttpEmbedder` against an OpenAI/Voyage/Cohere/Gemini compatible embeddings endpoint.
+2. **HNSW Vector Indexing on SQLite**: During in-memory SQLite unit testing, pgvector column types fall back to standard column mappings and HNSW vector index statements are ignored. Full HNSW indexing is exercised against live PostgreSQL 16 in CI and docker-compose.
 
 ---
 
-### Suggested Next Steps for Part 2 (Content System)
-1. **Content Schema & Domain Models**:
-   - Define models for pedagogical structure: `Topic`, `Subtopic`, `Unit`, `Concept`.
-   - Add content chunking schema: `ContentChunk` with text, token count, metadata, and pgvector `vector(1536)` embedding column.
-2. **Alembic Migration for Content**:
-   - Migration adding content tables, foreign keys, and pgvector cosine/HNSW distance indexes (`CREATE INDEX ... USING hnsw (embedding vector_cosine_ops)`).
-3. **Content Ingestion & Embedding Service**:
-   - Background service to parse markdown / curriculum definitions into chunks and generate vector embeddings.
-4. **Semantic Search & Retrieval Dependencies**:
-   - FastAPI dependencies and repository layer for similarity search over curriculum chunks using SQLAlchemy pgvector operators (`l2_distance`, `cosine_distance`).
-5. **Content API Routes**:
-   - `GET /content/topics`: Hierarchical curriculum navigation.
-   - `GET /content/chunk/{id}`: Detailed concept retrieval for tutoring sessions.
+### Suggested Next Steps for Part 3 (Chat & Dialogue Session Management)
+1. **Dialogue Session State**:
+   - Define database models for `DialogueSession`, `Turn`, and `LearnerState` linked to `users`.
+   - Store session history with concept tracking and diagnosed misconceptions.
+2. **Socratic Strategy Engine**:
+   - Implement dialogue turn state machine (e.g., *Elicit*, *Confront*, *Resolve*, *Practice*).
+   - Use `RetrievalService` to fetch relevant misconceptions from student messages and select corresponding `conflict_prompt` tasks.
+3. **LLM Orchestration & Prompt Crafting**:
+   - Secure LLM client provider with streaming response support.
+   - Inject retrieved concept definitions, targeted misconceptions, and conflict prompts into the system context while strictly maintaining the Socratic persona.

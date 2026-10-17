@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request, Response
 from redis.asyncio import Redis
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.api.concepts import router as concepts_router
 from app.api.health import router as health_router
 from app.api.me import router as me_router
 from app.config import Settings, get_settings
@@ -82,6 +83,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Route registrations
     app.include_router(health_router)
     app.include_router(me_router)
+    app.include_router(concepts_router)
 
     return app
 

@@ -1,40 +1,74 @@
 # Thinkloop - Engineering Rules & Architectural Contract
 
 ## Architecture Summary
-Thinkloop is an AI Socratic tutoring platform built with a high-reliability, async-first Python foundation. Part 1 establishes the production-grade core:
+Thinkloop is an AI Socratic tutoring platform built with a high-reliability, async-first Python foundation.
+
+### Part 1: Core Foundation
 - **Web Layer**: FastAPI with ASGI lifespan management and strict schema validation.
 - **Data Layer**: SQLAlchemy 2.x async ORM with `asyncpg`, PostgreSQL 16 (`pgvector` extension enabled), and Alembic migrations.
 - **Caching & Rate Limiting**: Redis via `redis-py` asyncio, sliding/fixed window rate limiting with graceful fail-open behavior.
 - **Security & Identity**: RS256 JWT verification via JWKS with caching and key-rotation refetch, decoupled auth-provider architecture (Clerk/Supabase compatible), idempotent user get-or-create on authenticated requests.
 - **Observability**: Structured JSON logging with correlated `request_id` (via `X-Request-ID`), uniform error response envelopes, non-leaking error handlers.
 
+### Part 2: Content System & Knowledge Graph
+- **Source of Truth**: Versioned YAML files in Git (`content/<domain>/<topic>/`) containing topic metadata, concepts, prerequisite edges, misconceptions, and problems.
+- **Database Synchronization**: The database is a derived cache of the YAML files. Sync is idempotent, transactional, and all-or-nothing. Removed rows are soft-deleted (`is_active=false`), never hard-deleted.
+- **Graph & Cross-File Validation**: `networkx` validates directed acyclic graph (DAG) invariants, prerequisite cycles, self-prerequisites, and orphaned nodes before DB writes. Symbolic math expressions validate with `sympy.sympify`.
+- **Vector Embeddings**: Embedding generation sits behind an `Embedder` protocol:
+  - `FakeEmbedder`: Deterministic hash-based unit-norm vectors used in all tests and CI.
+  - `HttpEmbedder`: Provider-agnostic HTTP client for remote embeddings endpoints (dimension configurable via `EMBEDDING_DIM`, default 1024).
+- **Retrieval & Graph Services**: Vector cosine similarity retrieval for concepts and misconceptions with prerequisite expansion. Read-side graph traversals for learning paths and prerequisites with infinite-loop guards.
+- **API Security**: Authenticated, rate-limited endpoints. Learner-facing endpoints strictly strip `answer_spec` to ensure answers never leave the server.
+
 ## Target Structure
 ```text
 backend/
+  content/
+    physics/mechanics/
+      topic.yaml            # topic metadata + schema_version
+      concepts.yaml
+      misconceptions.yaml
+      problems.yaml
   app/
     main.py              # create_app() factory
     config.py            # Settings (env-driven, fail fast)
     logging.py           # structured JSON logging + request_id
     errors.py            # AppError hierarchy + handlers
     api/
-      deps.py            # get_db, get_redis, current_user
+      deps.py            # get_db, get_redis, current_user, rate_limit
       health.py          # /health (liveness), /ready (db+redis)
       me.py              # GET /me
+      concepts.py        # /concepts, /topics/{topic}/graph, /problems
+    content/
+      schemas.py         # Pydantic models for YAML (strict, extra=forbid)
+      validator.py       # file + cross-file validation, graph DAG checks
+      loader.py          # YAML -> Postgres sync (idempotent, transactional)
+      embedder.py        # Embedder protocol, FakeEmbedder, HttpEmbedder
+      retrieval.py       # vector search + filters
+      service.py         # read-side graph & lookups service
+      cli.py             # Typer CLI: validate, sync, stats, eval-retrieval
     core/
       security.py        # JWKS fetch/cache, token verification
-      rate_limit.py      # Redis sliding/fixed window limiter dependency
+      rate_limit.py      # Redis sliding-window limiter dependency
     db/
       base.py            # Base declarative model + naming conventions
       session.py         # async engine & sessionmaker factory
-      models.py          # User model only
+      models.py          # User, Concept, ConceptEdge, Misconception, Problem
       migrations/        # Alembic environment and migration scripts
     schemas/
       user.py            # UserRead schemas
       error.py           # ErrorResponse schemas
+      content.py         # API response models
+  evals/
+    retrieval_cases.yaml # labeled retrieval evaluation dataset
+    run_retrieval_eval.py# evaluation runner (Recall@k, MRR, FP rate)
   tests/
-    conftest.py          # Pytest fixtures (DB, Redis, Mock JWKS, RSA keys)
+    conftest.py          # Pytest fixtures (DB, Redis, Mock JWKS, RSA keys, Embedder)
     unit/                # Isolated unit tests
     integration/         # API & migration integration tests
+    content/             # Tests validating real seed YAML content
+  docs/
+    content-authoring.md # Guide for non-engineers (teachers/authors)
   AGENTS.md              # Rules and architectural contract
   CLAUDE.md              # Mirror of AGENTS.md
   PROGRESS.md            # Progress log, assumptions, and next steps
@@ -63,21 +97,32 @@ backend/
    ```
    No unhandled tracebacks may ever be exposed to clients.
 7. **Traceability**: Every HTTP request receives or generates an `X-Request-ID` header. Every log entry emitted during that request lifecycle includes the `request_id`.
+8. **Content Invariants**:
+   - YAML is the source of truth; DB is a derived cache of it.
+   - `answer_spec` NEVER leaves the server via learner-facing endpoints.
+   - Tests NEVER call real embedding services (use `FakeEmbedder` in tests).
+   - Safe YAML loading only (`yaml.safe_load`).
+   - No hard DELETEs of content rows; sync soft-deletes via `is_active=False`.
 
 ## Definition of Done (DoD)
-- [ ] `make verify` passes from a clean checkout (lint, types, test, migration checks).
-- [ ] Test coverage >= 85%.
-- [ ] `alembic upgrade head` and `alembic downgrade base` both succeed.
-- [ ] `docker-compose up` + `uvicorn` serves `/health` and `/ready`.
-- [ ] A real JWT (from the test key) against `GET /me` returns 200 and creates exactly one user idempotently.
-- [ ] `.env.example` lists every required variable with descriptive comments.
-- [ ] `README.md` documents setup, env vars, running, testing, and adding a router.
-- [ ] `PROGRESS.md` contains built features, assumptions, known limitations, and Part 2 next steps.
+- [ ] `make verify` passes from a clean checkout (lint, types, test, migration checks, content validation, retrieval eval wiring test).
+- [ ] Part 1 foundation tests and endpoints continue to pass without regression.
+- [ ] Total test coverage >= 85%.
+- [ ] `content-validate --strict` passes on the real seed content with zero errors.
+- [ ] Seed content meets minimums: >=14 concepts (valid DAG), >=12 misconceptions, >=16 problems, every misconception has >=3 utterances + a prediction prompt.
+- [ ] `sync` run twice -> second run reports 0 changes (idempotent, no updated_at churn).
+- [ ] Migration upgrade head / downgrade works with pgvector columns + HNSW index.
+- [ ] Retrieval eval runs in fake mode (wiring test) and in http mode when credentials exist.
+- [ ] API: all 5 content endpoints work; `answer_spec` is never exposed in `/problems`.
+- [ ] `docs/content-authoring.md` enables non-engineers to author content and run validation.
+- [ ] `PROGRESS.md` records built features, assumptions, `# REVIEW` content list, known limitations, and Part 3 next steps.
 
 ## Forbidden Actions
-- Adding dependencies not listed in the stack without recording the rationale in `PROGRESS.md`.
+- Any Claude / LLM API calls (out of scope for Part 2).
 - Hardcoding secrets, real API keys, or committing a real `.env` file.
-- Building out-of-scope features (chat, LLM calls, content loading, mastery, sessions, Claude API code).
 - Making external network calls during automated test execution.
 - Disabling lint/type rules globally or adding `# type: ignore` / `# noqa` without a written reason.
+- Hard-deleting content rows or using unsafe `yaml.load`.
+- Returning `answer_spec` or `correct_index` from learner-facing endpoints.
+- Presenting unverified seed content as expert-verified (maintain honest `# REVIEW` markers).
 - Declaring "done" without pasting the full output of `make verify`.
