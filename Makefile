@@ -1,4 +1,4 @@
-.PHONY: up down lint format types test migrate migrate-down content-validate content-sync eval-retrieval verify
+.PHONY: up down lint format types test migrate migrate-down content-validate content-sync eval-retrieval verify frontend-install frontend-build frontend-lint frontend-dev
 
 up:
 	$(MAKE) -C backend up
@@ -35,3 +35,16 @@ eval-retrieval:
 
 verify:
 	$(MAKE) -C backend verify
+
+frontend-install:
+	cd frontend && npm install
+
+frontend-lint:
+	cd frontend && npm run lint
+
+frontend-build:
+	cd frontend && npm run build
+
+frontend-dev:
+	cd frontend && npm run dev
+
