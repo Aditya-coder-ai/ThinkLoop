@@ -191,3 +191,9 @@ html[data-theme='dark'] .site-scroll-stroke-container {
   z-index: 2;
 }
 
+/* Magic UI Smooth Cursor: hide native cursor everywhere when active */
+html.smooth-cursor-active,
+html.smooth-cursor-active * {
+  cursor: none !important;
+}
+
