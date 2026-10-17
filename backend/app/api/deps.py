@@ -11,16 +11,20 @@ from redis.asyncio import Redis
 
 if TYPE_CHECKING:
     RedisClient = Redis[str]
+    from app.core.diagnoser import DiagnoserService
+    from app.core.orchestrator import Orchestrator
 else:
     RedisClient = Redis
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
+from app.core.clock import Clock, SystemClock
 from app.core.rate_limit import RateLimiter
 from app.core.security import JWKSService, TokenPayload, verify_token
 from app.db.models import User
-from app.errors import AuthenticationError
+from app.errors import AuthenticationError, NotFoundError
+from app.services.llm import AnthropicClient, FakeLLMClient, LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -170,3 +174,83 @@ def rate_limit(
         await limiter.check_rate_limit(identifier=identifier)
 
     return _rate_limiter_dependency
+
+
+def get_llm_client(settings: Settings = Depends(get_settings)) -> LLMClient:
+    """Return LLM client instance (AnthropicClient or FakeLLMClient depending on env)."""
+    if settings.environment == "test" or not settings.anthropic_api_key:
+        return FakeLLMClient()
+    return AnthropicClient(
+        api_key=settings.anthropic_api_key,
+        default_model=settings.strong_model,
+    )
+
+
+async def get_diagnoser_service(
+    llm: LLMClient = Depends(get_llm_client),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> DiagnoserService:
+    """Provide configured DiagnoserService initialized from database."""
+    from app.content.embedder import Embedder, FakeEmbedder, HttpEmbedder
+    from app.content.retrieval import RetrievalService
+    from app.core.diagnoser import DiagnoserService
+
+    embedder: Embedder
+    if settings.environment == "test" or not settings.embedding_endpoint_url:
+        embedder = FakeEmbedder(dimension=settings.embedding_dim)
+    else:
+        embedder = HttpEmbedder(
+            endpoint_url=settings.embedding_endpoint_url,
+            api_key=settings.embedding_api_key or "",
+            model=settings.embedding_model,
+            dimension=settings.embedding_dim,
+        )
+    retrieval_service = await RetrievalService.from_db(session=db, embedder=embedder)
+    return DiagnoserService(
+        llm_client=llm,
+        retrieval_service=retrieval_service,
+        fast_model=settings.fast_model,
+    )
+
+
+def get_clock() -> Clock:
+    """Provide the authoritative system clock (can be overridden in tests)."""
+    return SystemClock()
+
+
+def require_feature(flag_name: str) -> Callable[..., None]:
+    """Dependency that checks if a specific feature flag is enabled.
+
+    Raises NotFoundError (404) with code FEATURE_DISABLED if the feature is disabled.
+    """
+
+    def dependency(settings: Settings = Depends(get_settings)) -> None:
+        if not getattr(settings, flag_name, False):
+            raise NotFoundError(
+                f"Feature '{flag_name}' is currently disabled",
+                code="FEATURE_DISABLED",
+            )
+
+    return dependency
+
+
+async def get_orchestrator(
+    llm: LLMClient = Depends(get_llm_client),
+    diagnoser: DiagnoserService = Depends(get_diagnoser_service),
+    settings: Settings = Depends(get_settings),
+    clock: Clock = Depends(get_clock),
+) -> Orchestrator:
+    """Provide configured Orchestrator instance."""
+    from app.core.orchestrator import Orchestrator
+    from app.services.history import HistoryService
+    from app.services.mastery import MasteryService
+
+    return Orchestrator(
+        llm_client=llm,
+        diagnoser=diagnoser,
+        mastery_service=MasteryService(),
+        history_service=HistoryService(),
+        settings=settings,
+        clock=clock,
+    )

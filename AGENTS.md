@@ -1,128 +1,110 @@
-# Thinkloop - Engineering Rules & Architectural Contract
+# Thinkloop — Engineering Rules & Architectural Contract
+
+## Product
+A learner chats with an AI tutor. Each turn the backend: diagnoses what the
+learner understands or misbelieves, verifies any math deterministically,
+updates a per-concept mastery model, picks a teaching strategy by rules,
+streams a reply, and persists everything. Principle: the LLM handles
+language; Python + Postgres handle logic, state and correctness. The LLM
+never has the final say on whether an answer is correct.
 
 ## Architecture Summary
-Thinkloop is an AI Socratic tutoring platform built with a high-reliability, async-first Python foundation.
+Thinkloop is an AI Socratic tutoring platform built with a high-reliability,
+async-first Python foundation across 16 sequential phases:
+- Phases 1-8: Core Foundation, Content System, Chat/Streaming, Diagnosis Engine,
+  Learner Model, Strategy & Orchestrator, Verification, Retention & Operations.
+- Phases 9-16: Extended Features (Clock & Groundwork, Streak Calendar, Focus Timer,
+  Doubt Log, Flashcards, Battle with AI, YouTube Video Suggestions, Voice Mode).
 
-### Part 1: Core Foundation
-- **Web Layer**: FastAPI with ASGI lifespan management and strict schema validation.
-- **Data Layer**: SQLAlchemy 2.x async ORM with `asyncpg`, PostgreSQL 16 (`pgvector` extension enabled), and Alembic migrations.
-- **Caching & Rate Limiting**: Redis via `redis-py` asyncio, sliding/fixed window rate limiting with graceful fail-open behavior.
-- **Security & Identity**: RS256 JWT verification via JWKS with caching and key-rotation refetch, decoupled auth-provider architecture (Clerk/Supabase compatible), idempotent user get-or-create on authenticated requests.
-- **Observability**: Structured JSON logging with correlated `request_id` (via `X-Request-ID`), uniform error response envelopes, non-leaking error handlers.
+### Phases 1-8 Foundation & Tutoring Summary
+- **Foundation**: FastAPI, async SQLAlchemy 2.x + asyncpg, PostgreSQL 16 (pgvector), Redis sliding-window rate limiting, RS256 JWKS auth, structured JSON logging with `X-Request-ID`.
+- **Content**: Safe YAML content (concepts, prerequisite DAG, misconceptions, problems), pgvector cosine retrieval, Embedder protocol (FakeEmbedder / HttpEmbedder).
+- **Dialogue & Orchestrator**: Fast Diagnoser, rule-based Strategy Engine, BKT mastery tracking, verification guard, SSE streaming.
 
-### Part 2: Content System & Knowledge Graph
-- **Source of Truth**: Versioned YAML files in Git (`content/<domain>/<topic>/`) containing topic metadata, concepts, prerequisite edges, misconceptions, and problems.
-- **Database Synchronization**: The database is a derived cache of the YAML files. Sync is idempotent, transactional, and all-or-nothing. Removed rows are soft-deleted (`is_active=false`), never hard-deleted.
-- **Graph & Cross-File Validation**: `networkx` validates directed acyclic graph (DAG) invariants, prerequisite cycles, self-prerequisites, and orphaned nodes before DB writes. Symbolic math expressions validate with `sympy.sympify`.
-- **Vector Embeddings**: Embedding generation sits behind an `Embedder` protocol:
-  - `FakeEmbedder`: Deterministic hash-based unit-norm vectors used in all tests and CI.
-  - `HttpEmbedder`: Provider-agnostic HTTP client for remote embeddings endpoints (dimension configurable via `EMBEDDING_DIM`, default 1024).
-- **Retrieval & Graph Services**: Vector cosine similarity retrieval for concepts and misconceptions with prerequisite expansion. Read-side graph traversals for learning paths and prerequisites with infinite-loop guards.
-- **API Security**: Authenticated, rate-limited endpoints. Learner-facing endpoints strictly strip `answer_spec` to ensure answers never leave the server.
+### Phases 9-16 Extended Features Summary
+- **Phase 9: Shared Groundwork**: Injectable `Clock` protocol (`SystemClock`, `FakeClock`). Feature flags (`FEATURE_*`). `user_preferences` (IANA timezone, daily goal, voice prefs). Idempotent `activity_events` logging with timezone-aware `local_date`.
+- **Phase 10: Streak Calendar**: Pure `compute_streaks` function, streak freezes (1 earned per N days, cap M, max 1 consecutive), calendar heatmap, nightly Arq rollup job `streak_rollup`.
+- **Phase 11: Focus Timer**: Server-authoritative Pomodoro study sessions (`focus_sessions`). Elapsed time computed via `Clock`. Early completion credit capped. Break suggestions. Arq cleanup job `focus_cleanup`.
+- **Phase 12: Doubt Log**: Capture questions (`doubts`), concept auto-suggestion via retrieval, `/ask` binds to Socratic tutor session without dumping answers, resolution requires "own words" note, semantic duplicate detection, insights aggregation.
+- **Phase 13: Flashcards**: Deterministic cards first from curated concepts & misconceptions; optional LLM-assisted cards (FAST_MODEL) grounded on source text with dedupe; SM-2 spaced repetition; lapse signals reopen misconceptions.
+- **Phase 14: Battle with AI**: Timed duels against simulated AI opponent (reproducible seeded RNG, outcome by code, not LLM); verifier-graded problems; server-authoritative deadlines; Elo ratings; mastery updates with reduced weight; cosmetic LLM flavor text only.
+- **Phase 15: YouTube Video Suggestions**: Trust ladder: Curated YAML (`content/videos/curated_videos.yaml`) first -> quota-aware YouTubeClient fallback. LLM never invents URLs or video IDs. Deterministic `video_ranker`.
+- **Phase 16: Voice Mode**: Input/output layer wrapping orchestrator turn. STT/TTS protocols (Fake + real HTTP). `responder_voice_v1.md` prompt. Deterministic `speakable_text` and spoken-math normalizers. Ephemeral audio processing.
 
 ## Target Structure
 ```text
 backend/
-  content/
-    physics/mechanics/
-      topic.yaml            # topic metadata + schema_version
-      concepts.yaml
-      misconceptions.yaml
-      problems.yaml
   app/
-    main.py              # create_app() factory
-    config.py            # Settings (env-driven, fail fast)
-    logging.py           # structured JSON logging + request_id
-    errors.py            # AppError hierarchy + handlers
-    api/
-      deps.py            # get_db, get_redis, current_user, rate_limit
-      health.py          # /health (liveness), /ready (db+redis)
-      me.py              # GET /me
-      concepts.py        # /concepts, /topics/{topic}/graph, /problems
-    content/
-      schemas.py         # Pydantic models for YAML (strict, extra=forbid)
-      validator.py       # file + cross-file validation, graph DAG checks
-      loader.py          # YAML -> Postgres sync (idempotent, transactional)
-      embedder.py        # Embedder protocol, FakeEmbedder, HttpEmbedder
-      retrieval.py       # vector search + filters
-      service.py         # read-side graph & lookups service
-      cli.py             # Typer CLI: validate, sync, stats, eval-retrieval
-    core/
-      security.py        # JWKS fetch/cache, token verification
-      rate_limit.py      # Redis sliding-window limiter dependency
-    db/
-      base.py            # Base declarative model + naming conventions
-      session.py         # async engine & sessionmaker factory
-      models.py          # User, Concept, ConceptEdge, Misconception, Problem
-      migrations/        # Alembic environment and migration scripts
-    schemas/
-      user.py            # UserRead schemas
-      error.py           # ErrorResponse schemas
-      content.py         # API response models
+    main.py config.py logging.py errors.py
+    api/        deps.py health.py me.py concepts.py sessions.py chat.py
+                mastery.py focus.py doubts.py flashcards.py battles.py
+                streak.py videos.py voice.py preferences.py
+    core/       security.py rate_limit.py orchestrator.py diagnoser.py
+                strategy.py responder.py verifier.py learner_model.py
+                activity.py streak_calc.py battle_engine.py opponent.py
+                flashcard_gen.py video_ranker.py voice_pipeline.py clock.py
+    content/    schemas.py validator.py loader.py embedder.py retrieval.py
+                service.py cli.py
+    services/   llm.py history.py stt.py tts.py youtube.py
+    db/         base.py session.py models.py migrations/
+    schemas/    user.py error.py content.py chat.py diagnosis.py mastery.py
+                preferences.py activity.py streak.py focus.py doubt.py
+                flashcard.py battle.py video.py voice.py
+    prompts/    diagnoser_v1.md responder_basic_v1.md strategy_*_v1.md
+                flashcard_gen_v1.md doubt_resolve_v1.md opponent_flavor_v1.md
+                responder_voice_v1.md
+    jobs/       focus_cleanup.py streak_rollup.py
+  content/
+    physics/mechanics/  topic.yaml concepts.yaml misconceptions.yaml problems.yaml
+    videos/             curated_videos.yaml
   evals/
-    retrieval_cases.yaml # labeled retrieval evaluation dataset
-    run_retrieval_eval.py# evaluation runner (Recall@k, MRR, FP rate)
+    retrieval_cases.yaml      run_retrieval_eval.py
+    flashcard_cases/          run_flashcard_eval.py
+    video_cases.yaml          run_video_eval.py
+    battle_sim/               run_battle_sim.py
   tests/
-    conftest.py          # Pytest fixtures (DB, Redis, Mock JWKS, RSA keys, Embedder)
-    unit/                # Isolated unit tests
-    integration/         # API & migration integration tests
-    content/             # Tests validating real seed YAML content
-  docs/
-    content-authoring.md # Guide for non-engineers (teachers/authors)
-  AGENTS.md              # Rules and architectural contract
-  CLAUDE.md              # Mirror of AGENTS.md
-  PROGRESS.md            # Progress log, assumptions, and next steps
-  Makefile               # Verification & dev targets
-  docker-compose.yml     # Local services (Postgres 16 + pgvector, Redis)
-  pyproject.toml         # Tooling and dependency specifications
-  .env.example           # Documented environment template
-  .github/workflows/ci.yml # Automated CI pipeline
+    unit/ integration/ content/ e2e/
+  docs/         content-authoring.md architecture.md
+  Makefile docker-compose.yml pyproject.toml .env.example .github/workflows/ci.yml
+  AGENTS.md CLAUDE.md PROGRESS.md
 ```
 
-## Coding Conventions
-1. **Strict Type Annotations**: Type hints everywhere. Every function, method, parameter, and return value must be strictly typed. Checked with `mypy --strict`.
-2. **Async Only**: All I/O paths (database, Redis, HTTP calls) must be purely asynchronous. No blocking calls in async event loop paths.
-3. **No Business Logic in Routes**: Route handlers only parse request parameters, call service/database dependencies, and return response schemas. Logic belongs in core modules, dependencies, or domain services.
-4. **Dependency Injection**: Inject all database sessions, Redis clients, configuration, authenticated users, and rate limiters via FastAPI `Depends()`.
-5. **Fail-Fast Configuration**: Validate all environment settings on startup using Pydantic v2 `BaseSettings`. Refuse to start with clear, descriptive errors if required variables are missing. Never log secrets or tokens.
-6. **Uniform Error Envelope**: All API error responses must adhere to:
-   ```json
-   {
-     "error": {
-       "code": "STRING_CODE",
-       "message": "Human-readable description",
-       "request_id": "uuid-string"
-     }
-   }
-   ```
-   No unhandled tracebacks may ever be exposed to clients.
-7. **Traceability**: Every HTTP request receives or generates an `X-Request-ID` header. Every log entry emitted during that request lifecycle includes the `request_id`.
-8. **Content Invariants**:
-   - YAML is the source of truth; DB is a derived cache of it.
-   - `answer_spec` NEVER leaves the server via learner-facing endpoints.
-   - Tests NEVER call real embedding services (use `FakeEmbedder` in tests).
-   - Safe YAML loading only (`yaml.safe_load`).
-   - No hard DELETEs of content rows; sync soft-deletes via `is_active=False`.
+## Product Principles
+1. **The Thinkloop Principle**: The LLM handles language; Python + Postgres handle logic, state, correctness, scoring, and scheduling. The LLM never decides who wins a battle, whether an answer is correct, or whether a streak day counts.
+2. **Every feature feeds the core**: Every feature feeds the learner model or the activity log; none is a disconnected mini-app.
+3. **No answer leakage**: Never reveal `answer_spec` before policy allows (battles included).
+4. **No hallucinated IDs or URLs**: The LLM may never invent URLs or video IDs. Only IDs returned by a verified source (curated YAML or YouTube API client) may be served.
+5. **Reuse existing building blocks**: SM-2 pure functions, verifier, retrieval, orchestrator, rate limiter, and token budget. Do not duplicate them.
+
+## Global Rules
+1. **No real network calls in tests**: All external dependencies (LLM, embeddings, STT, TTS, YouTube, JWKS) use Fake implementations in tests.
+2. **Authoritative Clock**: All time-dependent logic uses the injectable `Clock` (`SystemClock` / `FakeClock`), never `datetime.now()` directly. Server time is authoritative; never trust client timestamps for scoring, timers, or streaks.
+3. **No business logic in routes**: Services injected with `Depends`; async only.
+4. **Endpoint isolation & security**: Every endpoint requires auth, rate limiting, and strict user isolation (404 for other users' resources, never 403).
+5. **Privacy in logs**: No learner message text, transcripts, or raw audio in logs (log IDs and lengths only). Audio is deleted immediately after transcription unless opted in.
+6. **Database schema**: UUID pk, user_id FK, created_at, updated_at on all new tables. Reversible Alembic migrations with clean upgrade and downgrade.
+7. **Feature flags**: Every new feature is behind a flag in `Settings` (`FEATURE_BATTLE`, `FEATURE_FOCUS`, `FEATURE_FLASHCARDS`, `FEATURE_DOUBTS`, `FEATURE_STREAK`, `FEATURE_VOICE`, `FEATURE_VIDEOS`). Disabled -> 404 with uniform error envelope. Tested.
+8. **Versioned prompts**: Prompts stay versioned in `app/prompts/`. Models come from env (`FAST_MODEL`, `STRONG_MODEL`). No hardcoded model names, keys, or magic thresholds.
+9. **Idempotency**: Every mutating endpoint that a client might retry accepts an optional `Idempotency-Key` header and is safe to repeat.
+10. **Uniform error envelope**:
+    ```json
+    {
+      "error": {
+        "code": "STRING_CODE",
+        "message": "Human-readable description",
+        "request_id": "uuid-string"
+      }
+    }
+    ```
 
 ## Definition of Done (DoD)
-- [ ] `make verify` passes from a clean checkout (lint, types, test, migration checks, content validation, retrieval eval wiring test).
-- [ ] Part 1 foundation tests and endpoints continue to pass without regression.
-- [ ] Total test coverage >= 85%.
-- [ ] `content-validate --strict` passes on the real seed content with zero errors.
-- [ ] Seed content meets minimums: >=14 concepts (valid DAG), >=12 misconceptions, >=16 problems, every misconception has >=3 utterances + a prediction prompt.
-- [ ] `sync` run twice -> second run reports 0 changes (idempotent, no updated_at churn).
-- [ ] Migration upgrade head / downgrade works with pgvector columns + HNSW index.
-- [ ] Retrieval eval runs in fake mode (wiring test) and in http mode when credentials exist.
-- [ ] API: all 5 content endpoints work; `answer_spec` is never exposed in `/problems`.
-- [ ] `docs/content-authoring.md` enables non-engineers to author content and run validation.
-- [ ] `PROGRESS.md` records built features, assumptions, `# REVIEW` content list, known limitations, and Part 3 next steps.
-
-## Forbidden Actions
-- Any Claude / LLM API calls (out of scope for Part 2).
-- Hardcoding secrets, real API keys, or committing a real `.env` file.
-- Making external network calls during automated test execution.
-- Disabling lint/type rules globally or adding `# type: ignore` / `# noqa` without a written reason.
-- Hard-deleting content rows or using unsafe `yaml.load`.
-- Returning `answer_spec` or `correct_index` from learner-facing endpoints.
-- Presenting unverified seed content as expert-verified (maintain honest `# REVIEW` markers).
-- Declaring "done" without pasting the full output of `make verify`.
+- `make verify` passes from a clean checkout (lint, types, test, migration checks, content validation, retrieval eval, flashcards eval, video eval, battle sim).
+- All earlier phases pass without regression.
+- Total test coverage >= 85%.
+- All 7 feature flags supported and tested (disabled -> 404).
+- Injectable `Clock` used everywhere; zero `datetime.now()` in `app/`.
+- User isolation: 404 on accessing other users' resources.
+- Migrations work up and down cleanly.
+- Phase gates respected: cannot start Phase N+1 until Phase N gate is green and logged in `PROGRESS.md`.
+- Checkpoints with user respected after Phase 10, Phase 14, and Phase 16.
+- Final end-to-end integration test (`tests/e2e/test_features_flow.py`) passes cleanly.

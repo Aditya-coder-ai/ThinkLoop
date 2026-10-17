@@ -15,6 +15,7 @@ import {
   Moon,
   Sun,
 } from "lucide-react";
+import { ScrollProgressStroke } from "./components/ScrollProgressStroke";
 
 const loopSteps = [
   {
@@ -147,7 +148,8 @@ export default function Home() {
   const step = loopSteps[activeStep];
 
   return (
-    <main>
+    <main className="site-main">
+      <ScrollProgressStroke />
       <nav className="site-nav" aria-label="Main navigation">
         <a className="wordmark" href="#top" aria-label="Thinkloop home">
           <span className="wordmark-symbol" aria-hidden="true"><span /><span /><span /></span>

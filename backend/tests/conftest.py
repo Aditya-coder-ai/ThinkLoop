@@ -11,6 +11,8 @@ os.environ.setdefault("AUTH_JWKS_URL", "https://auth.thinkloop.ai/.well-known/jw
 os.environ.setdefault("AUTH_ISSUER", "https://auth.thinkloop.ai")
 os.environ.setdefault("AUTH_AUDIENCE", "thinkloop-api")
 
+from datetime import UTC
+
 import jwt
 import pytest
 from cryptography.hazmat.backends import default_backend
@@ -143,3 +145,13 @@ def token_factory(rsa_key_pair: dict[str, Any]):
         return jwt.encode(payload, key_to_use, algorithm="RS256", headers=headers)
 
     return _create_token
+
+
+@pytest.fixture
+def fake_clock() -> Any:
+    """Fixture providing a deterministic, advanceable FakeClock."""
+    from datetime import datetime
+
+    from app.core.clock import FakeClock
+
+    return FakeClock(datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC))

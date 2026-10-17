@@ -34,7 +34,6 @@ html[data-theme='dark'] {
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
 body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); transition: background-color .35s ease, color .35s ease; }
 a { color: inherit; text-decoration: none; }
 button { font: inherit; }
@@ -128,3 +127,67 @@ h1 em, h2 em { color: var(--clay); font-style: italic; }
 .stage-orbit { will-change: transform; }
 .stage-counter { will-change: transform, opacity; }
 @media (max-width: 900px) { .loop-progress { bottom: 24px; top: 24px; } }
+
+/* Site-Wide Scroll Progress Stroke (Thinkloop signature) */
+.site-main {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+}
+
+.site-scroll-stroke-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+  opacity: 0.68;
+  transition: opacity 0.35s ease;
+}
+
+html[data-theme='dark'] .site-scroll-stroke-container {
+  opacity: 0.46;
+}
+
+.site-scroll-stroke-svg {
+  position: absolute;
+  top: 0;
+  right: -10%;
+  width: 1278px;
+  height: 2319px;
+  pointer-events: none;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+}
+
+@media (max-width: 1280px) {
+  .site-scroll-stroke-svg {
+    right: -25%;
+    transform-origin: top right;
+  }
+}
+
+@media (max-width: 768px) {
+  .site-scroll-stroke-svg {
+    right: -55%;
+    width: 900px;
+    height: 1630px;
+    transform-origin: top right;
+  }
+}
+
+/* Ensure all content layers sit cleanly above the background stroke */
+.site-nav,
+.hero,
+.proof-strip,
+.section,
+.audience-section,
+.difference-section,
+.site-footer {
+  position: relative;
+  z-index: 2;
+}
+

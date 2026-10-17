@@ -57,10 +57,66 @@ class Settings(BaseSettings):
         description="Model name for HTTP embeddings provider",
     )
 
-    # Optional AI/LLM extension point (Part 2/3)
+    # LLM Settings
+    anthropic_api_key: str | None = Field(
+        default=None,
+        description="Anthropic API key for tutor dialogue and diagnosis",
+    )
+    fast_model: str = Field(
+        default="claude-3-5-haiku-latest",
+        description="Fast model for diagnosis and classification",
+    )
+    strong_model: str = Field(
+        default="claude-3-5-sonnet-latest",
+        description="Strong model for tutor replies",
+    )
     gemini_api_key: str | None = Field(
         default=None,
         description="Google Gemini API key for embeddings and Socratic dialogue",
+    )
+
+    # Strategy & Pedagogical Thresholds
+    strategy_mastery_low_threshold: float = Field(
+        default=0.35,
+        description="Mastery threshold below which worked_example is chosen",
+    )
+    strategy_mastery_high_threshold: float = Field(
+        default=0.70,
+        description="Mastery threshold above which socratic_challenge is chosen",
+    )
+    diagnoser_confidence_threshold: float = Field(
+        default=0.70,
+        description="Confidence threshold for misconception detection and grading",
+    )
+    prerequisite_weak_threshold: float = Field(
+        default=0.40,
+        description="Mastery threshold below which a prerequisite is considered weak",
+    )
+
+    # Feature Flags (Phases 9-16)
+    feature_battle: bool = Field(default=True, description="Enable Battle with AI")
+    feature_focus: bool = Field(default=True, description="Enable Focus Timer")
+    feature_flashcards: bool = Field(default=True, description="Enable Spaced Flashcards")
+    feature_doubts: bool = Field(default=True, description="Enable Doubt Log")
+    feature_streak: bool = Field(default=True, description="Enable Streak Calendar")
+    feature_voice: bool = Field(default=True, description="Enable Voice Mode")
+    feature_videos: bool = Field(default=True, description="Enable YouTube Video Suggestions")
+
+    # Streak & Calendar Rules (Phase 10)
+    streak_freeze_earn_days: int = Field(
+        default=7, description="Number of consecutive active days needed to earn 1 freeze"
+    )
+    streak_freeze_max_cap: int = Field(
+        default=2, description="Maximum number of banked streak freezes"
+    )
+    streak_initial_freezes: int = Field(
+        default=1, description="Initial free freezes for new user streak state"
+    )
+    streak_min_focus_minutes: int = Field(
+        default=10, description="Minimum focus minutes for a qualifying day"
+    )
+    streak_min_tutor_turns: int = Field(
+        default=1, description="Minimum gradable tutor turns for a qualifying day"
     )
 
     @field_validator("database_url")

@@ -10,7 +10,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.concepts import router as concepts_router
 from app.api.health import router as health_router
+from app.api.mastery import router as mastery_router
 from app.api.me import router as me_router
+from app.api.preferences import router as preferences_router
+from app.api.sessions import router as sessions_router
+from app.api.streak import router as streak_router
 from app.config import Settings, get_settings
 from app.core.security import JWKSService
 from app.db.session import create_engine, create_session_factory
@@ -64,7 +68,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         yield
 
         # Shutdown
-        await redis_client.close()
+        res = redis_client.close()
+        if hasattr(res, "__await__"):
+            await res
         await engine.dispose()
 
     app = FastAPI(
@@ -83,7 +89,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Route registrations
     app.include_router(health_router)
     app.include_router(me_router)
+    app.include_router(preferences_router)
     app.include_router(concepts_router)
+    app.include_router(sessions_router)
+    app.include_router(mastery_router)
+    app.include_router(streak_router)
 
     return app
 

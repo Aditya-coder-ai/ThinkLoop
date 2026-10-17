@@ -57,6 +57,17 @@ class NotFoundError(AppError):
         super().__init__(message=message, code=code, status_code=404)
 
 
+class ConflictError(AppError):
+    """Raised when an operation conflicts with the current resource state."""
+
+    def __init__(
+        self,
+        message: str = "Resource conflict",
+        code: str = "CONFLICT",
+    ) -> None:
+        super().__init__(message=message, code=code, status_code=409)
+
+
 class RateLimitExceededError(AppError):
     """Raised when client exceeds rate limit quotas."""
 
