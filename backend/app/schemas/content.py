@@ -8,6 +8,7 @@ class ConceptRead(BaseModel):
 
     id: str
     domain: str
+    subject: str | None = None
     topic: str
     title: str
     description: str

@@ -69,6 +69,7 @@ class Concept(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     domain: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    subject: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     topic: Mapped[str] = mapped_column(String, nullable=False, index=True)
     title: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str] = mapped_column(String, nullable=False)
@@ -399,6 +400,87 @@ class Mastery(Base):
         return (
             f"<Mastery user_id={self.user_id} concept_id={self.concept_id!r} "
             f"p_known={self.p_known:.2f}>"
+        )
+
+
+class Profile(Base):
+    """Learner profile entity capturing learner goals, level, and identity."""
+
+    __tablename__ = "profiles"
+
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
+    display_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    learning_level: Mapped[str | None] = mapped_column(String, nullable=True)
+    exam_target: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    # Relationships
+    mastery_records: Mapped[list["LearnerMastery"]] = relationship(
+        "LearnerMastery",
+        back_populates="profile",
+        cascade="all, delete-orphan",
+    )
+
+    def __repr__(self) -> str:
+        return f"<Profile user_id={self.user_id!r} display_name={self.display_name!r}>"
+
+
+class LearnerMastery(Base):
+    """Learner conceptual mastery tracking entity without duplicate entries."""
+
+    __tablename__ = "learner_mastery"
+    __table_args__ = (
+        UniqueConstraint("user_id", "concept_id", name="uq_learner_mastery_user_concept"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("profiles.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    concept_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("concepts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    mastery_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_practiced_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    next_review_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    # Relationships
+    profile: Mapped["Profile"] = relationship("Profile", back_populates="mastery_records")
+    concept: Mapped["Concept"] = relationship("Concept")
+
+    def __repr__(self) -> str:
+        return (
+            f"<LearnerMastery user_id={self.user_id!r} concept_id={self.concept_id!r} "
+            f"score={self.mastery_score}>"
         )
 
 

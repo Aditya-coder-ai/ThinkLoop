@@ -1,10 +1,10 @@
-"""FastAPI application factory and lifecycle management."""
-
+import logging
 import uuid
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from redis.asyncio import Redis
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -17,9 +17,12 @@ from app.api.sessions import router as sessions_router
 from app.api.streak import router as streak_router
 from app.config import Settings, get_settings
 from app.core.security import JWKSService
-from app.db.session import create_engine, create_session_factory
+from app.db.session import create_engine, create_session_factory, ping_database
 from app.errors import setup_exception_handlers
 from app.logging import configure_logging, set_request_id
+
+logger = logging.getLogger(__name__)
+
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
@@ -65,6 +68,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.redis = redis_client
         app.state.jwks_service = jwks_service
 
+        # Safe startup database connectivity validation
+        is_db_connected = await ping_database(engine)
+        if is_db_connected:
+            logger.info("Database connectivity verified on startup")
+        else:
+            logger.warning(
+                "Database connectivity probe failed on startup; will retry on demand"
+            )
+
         yield
 
         # Shutdown
@@ -81,6 +93,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     # Middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.add_middleware(RequestIdMiddleware)
 
     # Centralized exception handlers

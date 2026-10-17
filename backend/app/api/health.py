@@ -75,3 +75,23 @@ async def ready(
         "database": True,
         "redis": True,
     }
+
+
+@router.get(
+    "/health/db",
+    summary="Database connectivity check",
+    description="Validates active connectivity to the PostgreSQL database with safe response.",
+)
+async def health_db(
+    response: Response,
+    session: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    """Test database connectivity with safe, non-leaking responses."""
+    try:
+        await session.execute(text("SELECT 1"))
+        return {"database": "connected"}
+    except Exception as exc:
+        logger.warning("Database connectivity check failed: %s", type(exc).__name__)
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {"database": "disconnected", "error": "Database connectivity check failed"}
+

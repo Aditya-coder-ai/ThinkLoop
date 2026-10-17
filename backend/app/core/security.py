@@ -42,12 +42,19 @@ class JWKSService:
         self._lock = asyncio.Lock()
 
     def set_cached_keys(self, jwks_data: dict[str, Any]) -> None:
-        """Manually populate key cache (useful for testing or initial seeding)."""
+        """Populate key cache supporting Neon Auth EdDSA (Ed25519), RSA, and ECDSA keys."""
         keys: dict[str, Any] = {}
         for key_dict in jwks_data.get("keys", []):
             kid = key_dict.get("kid")
             if kid:
-                keys[kid] = RSAAlgorithm.from_jwk(key_dict)
+                try:
+                    pyjwk = jwt.PyJWK.from_dict(key_dict)
+                    keys[kid] = pyjwk.key
+                except Exception:
+                    try:
+                        keys[kid] = RSAAlgorithm.from_jwk(key_dict)
+                    except Exception as inner_exc:
+                        logger.warning("Failed to parse JWK with kid '%s': %s", kid, inner_exc)
         self._keys_cache = keys
         self._last_fetched_at = datetime.now(UTC)
 
@@ -113,10 +120,11 @@ async def verify_token(
             code="INVALID_TOKEN",
         ) from exc
 
+    allowed_algorithms = ["RS256", "EdDSA", "ES256", "ES384", "ES512"]
     alg = unverified_headers.get("alg")
-    if alg != "RS256":
+    if alg not in allowed_algorithms:
         raise AuthenticationError(
-            message=f"Unsupported token algorithm '{alg}', expected RS256",
+            message=f"Unsupported token algorithm '{alg}', expected one of {allowed_algorithms}",
             code="INVALID_ALGORITHM",
         )
 
@@ -129,20 +137,34 @@ async def verify_token(
 
     public_key = await jwks_service.get_key(kid)
 
+    # Build allowed issuers list (supports origin matching for Neon Auth)
+    issuers = [expected_issuer, expected_issuer.rstrip("/")]
+    if "/auth" in expected_issuer:
+        issuers.append(expected_issuer.split("/auth")[0])
+    if "/neondb" in expected_issuer:
+        issuers.append(expected_issuer.split("/neondb")[0])
+
+    decode_options: dict[str, Any] = {
+        "require": ["exp", "iss", "sub"],
+        "verify_exp": True,
+        "verify_iss": True,
+        "verify_signature": True,
+    }
+
+    if expected_audience:
+        decode_options["require"].append("aud")
+        decode_options["verify_aud"] = True
+    else:
+        decode_options["verify_aud"] = False
+
     try:
         payload = jwt.decode(
             token,
             public_key,
-            algorithms=["RS256"],
-            issuer=expected_issuer,
-            audience=expected_audience,
-            options={
-                "require": ["exp", "iss", "aud", "sub"],
-                "verify_exp": True,
-                "verify_iss": True,
-                "verify_aud": True,
-                "verify_signature": True,
-            },
+            algorithms=allowed_algorithms,
+            issuer=issuers if len(issuers) > 1 else expected_issuer,
+            audience=expected_audience if expected_audience else None,
+            options=decode_options,
         )
     except jwt.ExpiredSignatureError as exc:
         raise AuthenticationError("Token has expired", code="TOKEN_EXPIRED") from exc

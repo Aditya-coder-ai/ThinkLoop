@@ -30,6 +30,7 @@ router = APIRouter(tags=["content"])
 async def list_concepts(
     domain: str | None = Query(None, description="Filter by domain"),
     topic: str | None = Query(None, description="Filter by topic"),
+    subject: str | None = Query(None, description="Filter by subject"),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> list[ConceptRead]:
@@ -39,6 +40,8 @@ async def list_concepts(
         query = query.where(Concept.domain == domain)
     if topic:
         query = query.where(Concept.topic == topic)
+    if subject:
+        query = query.where(Concept.subject == subject)
 
     query = query.order_by(Concept.id.asc())
     result = await db.execute(query)

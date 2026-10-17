@@ -3,7 +3,7 @@ name = "thinkloop-backend"
 version = "0.1.0"
 description = "FastAPI backend foundation for Thinkloop AI Socratic tutoring platform"
 readme = "README.md"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",

@@ -172,3 +172,50 @@
 3. **LLM Orchestration & Prompt Crafting**:
    - Secure LLM client provider with streaming response support.
    - Inject retrieved concept definitions, targeted misconceptions, and conflict prompts into the system context while strictly maintaining the Socratic persona.
+
+---
+
+## Neon PostgreSQL Integration Summary
+
+### What Was Built
+1. **Neon Connection Engine & Pooling (`app/db/session.py`)**:
+   - Resilient URL normalization converting standard `postgresql://` or `postgres://` connection strings to async SQLAlchemy `postgresql+asyncpg://`.
+   - Automatic query parameter sanitization for `sslmode=require` mapping to secure SSL context for `asyncpg`.
+   - Neon PgBouncer transaction-pooler compatibility (`-pooler.` hostname detection) disabling prepared statement cache (`prepared_statement_cache_size=0`).
+   - Connection pool resilience: `pool_size=10`, `max_overflow=20`, `pool_pre_ping=True` (handles idle compute suspension and drops), `pool_recycle=300`.
+   - Non-leaking startup / connectivity ping helper (`ping_database`).
+
+2. **Schema & Migration (`0003_learner_profiles_and_mastery.py`, `app/db/models.py`)**:
+   - Added `Profile` model (`profiles` table: `user_id` PK, `display_name`, `learning_level`, `exam_target`, `created_at`, `updated_at`).
+   - Added `LearnerMastery` model (`learner_mastery` table: `id` PK, `user_id` FK to `profiles.user_id`, `concept_id` FK to `concepts.id`, `mastery_score`, `attempts`, `last_practiced_at`, `next_review_at`, `updated_at`, with `UniqueConstraint("user_id", "concept_id")`).
+   - Added `subject` column to `Concept` model and `concepts` table.
+   - Idempotent migration that safely inspects live schemas without overwriting or destroying existing data.
+
+3. **Backend-Only Health Probe (`GET /health/db`)**:
+   - `GET /health/db`: returns `{"database": "connected"}` (200 OK) when healthy.
+   - On error: returns `{"database": "disconnected", "error": "Database connectivity check failed"}` (503 Service Unavailable).
+   - Zero disclosure of connection strings, SQL details, or stack traces.
+
+4. **Typed Repository Operations (`app/db/repository.py`)**:
+   - `check_db_connectivity`: Lightweight `SELECT 1` ping.
+   - `list_concepts`: Active concepts with domain, topic, and subject filters.
+   - `get_concept_by_id`: Active concept lookup.
+   - `get_learner_profile`: Learner profile lookup by user ID.
+   - `upsert_learner_profile`: Idempotent profile creation and field updates.
+   - `get_learner_mastery`: Mastery progress lookup.
+   - `upsert_learner_mastery`: Idempotent upsert preventing duplicate records, incrementing attempts.
+
+5. **Learner API & Auth Readiness (`app/api/me.py`, `app/schemas/learner.py`)**:
+   - `GET /me/profile`: Authenticated user's profile.
+   - `PUT /me/profile`: Safely upserts authenticated user's profile.
+   - `GET /me/mastery`: Authenticated user's mastery progress.
+   - `POST /me/mastery`: Upserts mastery progress with verified ownership.
+   - Strict identity derivation from `current_user.auth_id` (browser cannot supply or spoof user IDs).
+
+6. **Automated Test Suite**:
+   - `tests/unit/test_neon_session.py`: Connection string parsing, SSL, pooler detection, and error masking.
+   - `tests/unit/test_repository.py`: All 7 repository operations, duplicate prevention, and user isolation.
+   - `tests/integration/test_db_health.py`: `/health/db` success and failure handling.
+   - `tests/integration/test_learner_api.py`: Learner profile, mastery, and auth protection.
+   - `tests/integration/test_neon_live.py`: Non-destructive live test against real Neon database when `TEST_DATABASE_URL` is configured.
+
