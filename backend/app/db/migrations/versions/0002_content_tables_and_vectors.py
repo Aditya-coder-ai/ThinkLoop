@@ -40,10 +40,16 @@ def upgrade() -> None:
             sa.Column("content_hash", sa.String(), nullable=False),
             sa.Column("embedding", Vector(1024), nullable=True),
             sa.Column(
-                "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+                "created_at",
+                sa.DateTime(timezone=True),
+                server_default=sa.func.now(),
+                nullable=False,
             ),
             sa.Column(
-                "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+                "updated_at",
+                sa.DateTime(timezone=True),
+                server_default=sa.func.now(),
+                nullable=False,
             ),
             sa.PrimaryKeyConstraint("id", name=op.f("pk_concepts")),
         )
@@ -104,10 +110,16 @@ def upgrade() -> None:
             sa.Column("content_hash", sa.String(), nullable=False),
             sa.Column("embedding", Vector(1024), nullable=True),
             sa.Column(
-                "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+                "created_at",
+                sa.DateTime(timezone=True),
+                server_default=sa.func.now(),
+                nullable=False,
             ),
             sa.Column(
-                "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+                "updated_at",
+                sa.DateTime(timezone=True),
+                server_default=sa.func.now(),
+                nullable=False,
             ),
             sa.ForeignKeyConstraint(
                 ["concept_id"],
@@ -143,10 +155,16 @@ def upgrade() -> None:
             sa.Column("is_active", sa.Boolean(), server_default=sa.true(), nullable=False),
             sa.Column("content_hash", sa.String(), nullable=False),
             sa.Column(
-                "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+                "created_at",
+                sa.DateTime(timezone=True),
+                server_default=sa.func.now(),
+                nullable=False,
             ),
             sa.Column(
-                "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+                "updated_at",
+                sa.DateTime(timezone=True),
+                server_default=sa.func.now(),
+                nullable=False,
             ),
             sa.ForeignKeyConstraint(
                 ["concept_id"],

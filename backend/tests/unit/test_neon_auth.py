@@ -1,7 +1,5 @@
 """Unit test for Neon Auth EdDSA (Ed25519) JWKS key parsing and verification."""
 
-import pytest
-
 from app.core.security import JWKSService
 
 

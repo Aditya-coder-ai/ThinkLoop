@@ -1,8 +1,8 @@
 """Create learner profiles, learner mastery tracking, and concept subject.
 
-Revision ID: 0003_learner_profiles_and_mastery
-Revises: 0002_content_tables
-Create Date: 2026-10-17 12:00:00.000000
+Revision ID: 0009_learner_profiles
+Revises: 0008_streak_and_daily_activity
+Create Date: 2026-10-17 19:00:00.000000
 
 """
 
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "0003_learner_profiles"
-down_revision: str | None = "0002_content_tables"
+revision: str = "0009_learner_profiles"
+down_revision: str | None = "0008_streak_and_daily_activity"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -110,6 +110,7 @@ def downgrade() -> None:
         if "subject" in concept_cols:
             if bind.dialect.name == "sqlite":
                 with op.batch_alter_table("concepts") as batch_op:
+                    batch_op.drop_index("ix_concepts_subject")
                     batch_op.drop_column("subject")
             else:
                 op.drop_index(op.f("ix_concepts_subject"), table_name="concepts")

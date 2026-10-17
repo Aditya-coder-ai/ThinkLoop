@@ -173,13 +173,10 @@ async def upsert_learner_mastery(
         if next_review_at is not None:
             update_dict["next_review_at"] = next_review_at
 
-        stmt = (
-            insert_stmt.on_conflict_do_update(
-                index_elements=[LearnerMastery.user_id, LearnerMastery.concept_id],
-                set_=update_dict,
-            )
-            .returning(LearnerMastery)
-        )
+        stmt = insert_stmt.on_conflict_do_update(
+            index_elements=[LearnerMastery.user_id, LearnerMastery.concept_id],
+            set_=update_dict,
+        ).returning(LearnerMastery)
         result = await session.execute(stmt)
         mastery = result.scalar_one()
         await session.commit()
@@ -189,7 +186,7 @@ async def upsert_learner_mastery(
         # SQLite dialect handling for local/test environments
         from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-        insert_stmt = sqlite_insert(LearnerMastery).values(
+        sqlite_insert_stmt = sqlite_insert(LearnerMastery).values(
             user_id=user_id,
             concept_id=concept_id,
             mastery_score=mastery_score,
@@ -207,13 +204,10 @@ async def upsert_learner_mastery(
         if next_review_at is not None:
             update_dict["next_review_at"] = next_review_at
 
-        stmt = (
-            insert_stmt.on_conflict_do_update(
-                index_elements=[LearnerMastery.user_id, LearnerMastery.concept_id],
-                set_=update_dict,
-            )
-            .returning(LearnerMastery)
-        )
+        stmt = sqlite_insert_stmt.on_conflict_do_update(
+            index_elements=[LearnerMastery.user_id, LearnerMastery.concept_id],
+            set_=update_dict,
+        ).returning(LearnerMastery)
         result = await session.execute(stmt)
         mastery = result.scalar_one()
         await session.commit()

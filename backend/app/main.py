@@ -24,7 +24,6 @@ from app.logging import configure_logging, set_request_id
 logger = logging.getLogger(__name__)
 
 
-
 class RequestIdMiddleware(BaseHTTPMiddleware):
     """Propagate or generate X-Request-ID for every HTTP request."""
 
@@ -73,9 +72,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if is_db_connected:
             logger.info("Database connectivity verified on startup")
         else:
-            logger.warning(
-                "Database connectivity probe failed on startup; will retry on demand"
-            )
+            logger.warning("Database connectivity probe failed on startup; will retry on demand")
 
         yield
 

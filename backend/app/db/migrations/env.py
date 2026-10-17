@@ -3,11 +3,11 @@
 import asyncio
 import os
 from logging.config import fileConfig
+from typing import Any
 
 from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.db import models  # noqa: F401 - ensure models are registered with Base.metadata
 from app.db.base import Base
@@ -27,6 +27,7 @@ def get_url() -> str:
     if not db_url:
         try:
             from app.config import get_settings
+
             db_url = get_settings().database_url
         except Exception:
             pass
@@ -60,7 +61,7 @@ def do_run_migrations(connection: Connection) -> None:
         context.run_migrations()
 
 
-async def run_async_migrations(url: str, connect_args: dict) -> None:
+async def run_async_migrations(url: str, connect_args: dict[str, Any]) -> None:
     """Create async engine and execute migrations asynchronously."""
     from sqlalchemy.ext.asyncio import create_async_engine
 

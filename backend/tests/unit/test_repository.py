@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.db.base import Base
-from app.db.models import Concept, LearnerMastery, Profile
+from app.db.models import Concept, Profile
 from app.db.repository import (
     check_db_connectivity,
     get_concept_by_id,
@@ -175,7 +175,7 @@ async def test_profile_creation_and_retrieval(db_session: AsyncSession) -> None:
 
 @pytest.mark.asyncio
 async def test_mastery_upsert_prevents_duplicate_records(db_session: AsyncSession) -> None:
-    """upsert_learner_mastery updates progress without creating duplicates for same user and concept."""
+    """Upsert learner mastery updates progress without duplicate records for concept."""
     user_id = "auth0|user_test_mastery"
     concept_id = "concept_physics_momentum"
 

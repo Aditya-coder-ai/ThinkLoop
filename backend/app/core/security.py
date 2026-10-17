@@ -5,7 +5,7 @@ import logging
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import jwt
@@ -164,7 +164,7 @@ async def verify_token(
             algorithms=allowed_algorithms,
             issuer=issuers if len(issuers) > 1 else expected_issuer,
             audience=expected_audience if expected_audience else None,
-            options=decode_options,
+            options=cast(Any, decode_options),
         )
     except jwt.ExpiredSignatureError as exc:
         raise AuthenticationError("Token has expired", code="TOKEN_EXPIRED") from exc

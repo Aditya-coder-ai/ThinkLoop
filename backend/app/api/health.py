@@ -94,4 +94,3 @@ async def health_db(
         logger.warning("Database connectivity check failed: %s", type(exc).__name__)
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return {"database": "disconnected", "error": "Database connectivity check failed"}
-

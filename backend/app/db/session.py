@@ -30,6 +30,10 @@ def normalize_neon_database_url(raw_url: str) -> tuple[str, dict[str, Any]]:
     parsed = urlparse(clean_url)
     scheme = parsed.scheme.lower()
 
+    # Pass through non-postgres URLs (e.g. SQLite URLs used in migration verify or test suites)
+    if not scheme.startswith("postgres"):
+        return clean_url, {}
+
     # Map synchronous schemes to asyncpg driver scheme
     if scheme in ("postgresql", "postgres"):
         scheme = "postgresql+asyncpg"
@@ -52,14 +56,16 @@ def normalize_neon_database_url(raw_url: str) -> tuple[str, dict[str, Any]]:
 
     # Reconstruct query without unsupported asyncpg parameters
     new_query = urlencode(query_params, doseq=True)
-    normalized_url = urlunparse((
-        scheme,
-        parsed.netloc,
-        parsed.path,
-        parsed.params,
-        new_query,
-        parsed.fragment,
-    ))
+    normalized_url = urlunparse(
+        (
+            scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            new_query,
+            parsed.fragment,
+        )
+    )
 
     # Configure SSL context if sslmode is specified or if connecting to Neon Cloud
     if sslmode_vals or "neon.tech" in hostname:
@@ -84,13 +90,15 @@ def create_engine(database_url: str) -> AsyncEngine:
 
     if "postgresql+asyncpg" in normalized_url:
         # Neon PostgreSQL connection pool settings
-        engine_kwargs.update({
-            "pool_size": 10,
-            "max_overflow": 20,
-            "pool_pre_ping": True,
-            "pool_recycle": 300,
-            "connect_args": connect_args,
-        })
+        engine_kwargs.update(
+            {
+                "pool_size": 10,
+                "max_overflow": 20,
+                "pool_pre_ping": True,
+                "pool_recycle": 300,
+                "connect_args": connect_args,
+            }
+        )
     elif "sqlite" in normalized_url:
         engine_kwargs["connect_args"] = {"check_same_thread": False}
 
@@ -116,4 +124,3 @@ async def ping_database(engine: AsyncEngine) -> bool:
     except Exception as exc:
         logger.warning("Database connectivity check failed: %s", type(exc).__name__)
         return False
-

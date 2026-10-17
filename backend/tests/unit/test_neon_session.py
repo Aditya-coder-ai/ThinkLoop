@@ -23,7 +23,9 @@ def test_normalize_url_transforms_standard_postgres_scheme() -> None:
 
 def test_normalize_url_handles_neon_pooler_prepared_statements() -> None:
     """Neon pooler endpoint (-pooler.) disables prepared statement cache for PgBouncer."""
-    url = "postgresql://user:password@ep-sample-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require"
+    url = (
+        "postgresql://user:password@ep-sample-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require"
+    )
     normalized, connect_args = normalize_neon_database_url(url)
 
     assert normalized.startswith("postgresql+asyncpg://")
