@@ -136,7 +136,8 @@ export async function fetchCalendar(monthString?: string): Promise<CalendarHeatm
     const res = await fetchWithAuth(`/streak/calendar?month=${targetMonth}`);
     if (res.ok) {
       const data = await res.json();
-      return data.days.map((d: any) => ({
+      const rawDays = Array.isArray(data) ? data : data.days || [];
+      return rawDays.map((d: any) => ({
         date: d.date,
         minutes: d.minutes,
         level: d.level,
@@ -179,10 +180,11 @@ export async function fetchCalendar(monthString?: string): Promise<CalendarHeatm
  */
 export async function fetchConceptMastery(): Promise<ConceptMastery[]> {
   try {
-    const res = await fetchWithAuth("/mastery/mechanics");
+    const res = await fetchWithAuth("/mastery?topic=mechanics");
     if (res.ok) {
       const data = await res.json();
-      const nodeMap = new Map(data.nodes.map((n: any) => [n.concept_id, n]));
+      const rawNodes = Array.isArray(data.nodes) ? data.nodes : [];
+      const nodeMap = new Map(rawNodes.map((n: any) => [n.concept_id, n]));
       return CURRICULUM_CONCEPTS.map((c) => {
         const node = nodeMap.get(c.id) as any;
         return {
