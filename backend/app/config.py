@@ -35,8 +35,8 @@ class Settings(BaseSettings):
         description="Expected JWT issuer claim ('iss')",
     )
     auth_audience: str = Field(
-        ...,
-        description="Expected JWT audience claim ('aud')",
+        default="",
+        description="Expected JWT audience claim ('aud'). Empty string disables audience verification (required for Clerk).",
     )
 
     # Optional configuration overrides
