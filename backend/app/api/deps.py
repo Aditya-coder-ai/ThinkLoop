@@ -129,6 +129,15 @@ async def get_current_user(
         )
 
     token = parts[1]
+    if settings.environment == "development" and token.startswith("dev_"):
+        auth_id = token
+        payload = TokenPayload(
+            auth_id=auth_id,
+            email=f"{auth_id}@thinkloop.ai",
+            raw_claims={"sub": auth_id, "iss": settings.auth_issuer, "aud": settings.auth_audience},
+        )
+        return await get_or_create_user(session=session, payload=payload)
+
     payload = await verify_token(
         token=token,
         jwks_service=jwks_service,

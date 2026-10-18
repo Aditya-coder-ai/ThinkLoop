@@ -14,6 +14,8 @@ import {
   Lightbulb,
   Moon,
   Sun,
+  X,
+  User,
 } from "lucide-react";
 import { ScrollProgressStroke } from "./components/ScrollProgressStroke";
 
@@ -128,6 +130,8 @@ function Reveal({ children, delay = 0, className = "" }: { children: React.React
 export default function Home() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [activeStep, setActiveStep] = useState(0);
+  const [showSignInModal, setShowSignInModal] = useState(false);
+  const [learnerName, setLearnerName] = useState("Aditya");
   const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
@@ -145,6 +149,21 @@ export default function Home() {
     window.localStorage.setItem("thinkloop-theme", nextTheme);
   };
 
+  const handleSignIn = (name: string) => {
+    const userProfile = {
+      id: "u_dev_1",
+      authId: `dev_${name.toLowerCase().replace(/\s+/g, "_")}`,
+      name: name || "Aditya",
+      email: `${name.toLowerCase().replace(/\s+/g, "_")}@thinkloop.ai`,
+      timezone: "UTC",
+      dailyGoalMinutes: 30,
+      voiceEnabled: true,
+    };
+    window.localStorage.setItem("thinkloop_user_profile", JSON.stringify(userProfile));
+    window.localStorage.setItem("thinkloop_auth_token", `Bearer ${userProfile.authId}`);
+    window.location.href = "/workspace";
+  };
+
   const step = loopSteps[activeStep];
 
   return (
@@ -159,13 +178,19 @@ export default function Home() {
           <a href="#method">The method</a>
           <a href="#features">What it notices</a>
           <a href="#mvp">MVP</a>
+          <a href="/workspace" className="font-semibold text-clay">Workspace</a>
         </div>
         <div className="nav-actions">
           <button className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}>
             {theme === "light" ? <Moon size={16} strokeWidth={1.8} /> : <Sun size={16} strokeWidth={1.8} />}
             <span>{theme === "light" ? "Night" : "Day"}</span>
           </button>
-          <a className="nav-cta" href="#mvp">See the loop <ArrowUpRight size={16} /></a>
+          <button className="nav-cta cursor-pointer" onClick={() => setShowSignInModal(true)}>
+            Sign In
+          </button>
+          <a className="button button-primary" href="/workspace">
+            Enter Workspace <ArrowUpRight size={16} />
+          </a>
         </div>
       </nav>
 
@@ -182,8 +207,8 @@ export default function Home() {
           </Reveal>
           <Reveal delay={0.24}>
             <div className="hero-actions">
-              <a className="button button-primary" href="#method">Explore the method <ArrowDown size={16} /></a>
-              <a className="text-link" href="#difference">Why Thinkloop? <ArrowUpRight size={16} /></a>
+              <a className="button button-primary" href="/workspace">Launch Workspace <ArrowUpRight size={16} /></a>
+              <a className="text-link" href="#method">Explore the method <ArrowDown size={16} /></a>
             </div>
           </Reveal>
           <Reveal delay={0.32}>
@@ -269,10 +294,75 @@ export default function Home() {
 
       <section className="difference-section" id="mvp">
         <div className="difference-main"><div className="section-label"><span>05</span><span>The first version</span></div><Reveal><h2>Not more content.<br /><em>More connection.</em></h2></Reveal><Reveal delay={0.1}><p>Thinkloop’s MVP is focused on one reliable promise: if you keep showing your thinking, it can keep helping you move forward.</p></Reveal><div className="mvp-list">{["Socratic tutoring that keeps the answer yours", "Topic-based assessments with reasoning evidence", "Likely misconception detection", "A persistent learner profile", "Progress and next-step recommendations"].map((item, index) => <Reveal key={item} delay={0.12 + index * 0.04}><div className="mvp-item"><span>0{index + 1}</span><p>{item}</p><Check size={16} /></div></Reveal>)}</div></div>
-        <div className="closing-card"><div className="closing-ring ring-one" /><div className="closing-ring ring-two" /><div className="closing-mark"><span /><span /><span /></div><p>Keep the question.<br /><strong>Change the way<br />you find the answer.</strong></p><a href="#top" className="button button-light">Back to the beginning <ArrowUpRight size={16} /></a></div>
+        <div className="closing-card"><div className="closing-ring ring-one" /><div className="closing-ring ring-two" /><div className="closing-mark"><span /><span /><span /></div><p>Keep the question.<br /><strong>Change the way<br />you find the answer.</strong></p><a href="/workspace" className="button button-light">Enter Workspace <ArrowUpRight size={16} /></a></div>
       </section>
 
       <footer className="site-footer"><a className="wordmark" href="#top"><span className="wordmark-symbol" aria-hidden="true"><span /><span /><span /></span><span>thinkloop</span></a><p>Learning that leaves you with more than an answer.</p><span className="footer-note">A cognitive learning system / 2025</span></footer>
+
+      {showSignInModal && (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="modal-header">
+              <h3>Sign in to Thinkloop</h3>
+              <button className="modal-close-btn" onClick={() => setShowSignInModal(false)} aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="setup-sub" style={{ textAlign: "left", marginBottom: "18px" }}>
+              Access your personal cognitive mentor, live streak calendar, concept mastery graph, and doubt ledger.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "20px" }}>
+              <button
+                className="button-primary"
+                style={{ width: "100%", justifyContent: "center" }}
+                onClick={() => handleSignIn("Aditya")}
+              >
+                <User size={16} />
+                <span>Continue as Aditya (Demo Learner)</span>
+              </button>
+
+              <button
+                className="button-outline-sm"
+                style={{ width: "100%", justifyContent: "center", padding: "10px" }}
+                onClick={() => handleSignIn("Guest Learner")}
+              >
+                <span>Continue as Guest</span>
+              </button>
+            </div>
+
+            <div style={{ borderTop: "1px solid var(--line)", paddingTop: "16px" }}>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "6px" }}>
+                Or customize your learner name:
+              </label>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input
+                  type="text"
+                  placeholder="Enter your name"
+                  value={learnerName}
+                  onChange={(e) => setLearnerName(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: "10px 14px",
+                    borderRadius: "8px",
+                    border: "1px solid var(--line)",
+                    background: "var(--paper-deep)",
+                    color: "var(--ink)",
+                    fontSize: "13px",
+                  }}
+                />
+                <button
+                  className="button-primary"
+                  onClick={() => handleSignIn(learnerName)}
+                >
+                  Enter
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
