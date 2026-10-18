@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { UserButton } from "@clerk/nextjs";
 import { Flame, Shield, Clock, Moon, Sun, User as UserIcon, LogOut, Settings as SettingsIcon } from "lucide-react";
 import { StreakState, UserProfile } from "../types";
 
@@ -81,11 +82,9 @@ export function WorkspaceHeader({
           <SettingsIcon size={16} />
         </button>
 
-        {/* Profile Pill */}
-        <div className="profile-pill">
-          <div className="profile-avatar">
-            <UserIcon size={14} />
-          </div>
+        {/* Profile Pill & Clerk User Management */}
+        <div className="profile-pill" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <UserButton afterSignOutUrl="/" />
           <span className="profile-name">{user.name}</span>
           <button
             onClick={onSignOut}

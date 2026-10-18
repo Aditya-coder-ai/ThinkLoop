@@ -22,9 +22,11 @@ import {
   ConceptItem,
 } from "./types";
 import { CURRICULUM_CONCEPTS } from "./curriculum";
+import { useUser, useClerk } from "@clerk/nextjs";
 import {
   getStoredUser,
   setStoredUser,
+  setStoredToken,
   clearStoredAuth,
   fetchUserProfile,
   fetchStreak,
@@ -34,7 +36,7 @@ import {
 import {
   authStore,
   bootstrapSession,
-  signOut,
+  signOut as coreSignOut,
   AuthStatus,
 } from "../../lib/auth";
 import { WorkspaceHeader } from "./components/WorkspaceHeader";
@@ -47,10 +49,45 @@ import { BattleArenaView } from "./components/BattleArenaView";
 import { PreferencesModal } from "./components/PreferencesModal";
 
 export default function WorkspacePage() {
+  const { isLoaded, isSignedIn, user: clerkUser } = useUser();
+  const { signOut: clerkSignOut, session } = useClerk();
+
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("tutor");
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [user, setUser] = useState<UserProfile>(getStoredUser());
   const [showPreferences, setShowPreferences] = useState(false);
+
+  useEffect(() => {
+    if (isLoaded && clerkUser) {
+      const email = clerkUser.primaryEmailAddress?.emailAddress || "";
+      const name =
+        clerkUser.fullName ||
+        clerkUser.firstName ||
+        clerkUser.username ||
+        "Learner";
+      setUser((prev) => {
+        const profile: UserProfile = {
+          id: clerkUser.id,
+          authId: clerkUser.id,
+          name,
+          email,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+          dailyGoalMinutes: prev.dailyGoalMinutes || 30,
+          voiceEnabled: prev.voiceEnabled ?? true,
+        };
+        setStoredUser(profile);
+        return profile;
+      });
+
+      if (session) {
+        session.getToken().then((token) => {
+          if (token) {
+            setStoredToken(`Bearer ${token}`);
+          }
+        });
+      }
+    }
+  }, [isLoaded, clerkUser, session]);
 
   // Core state
   const [activeConcept, setActiveConcept] = useState<ConceptItem>(CURRICULUM_CONCEPTS[4]); // Newton's 1st Law
@@ -154,7 +191,15 @@ export default function WorkspacePage() {
   };
 
   const handleSignOut = async () => {
-    await signOut();
+    try {
+      if (clerkSignOut) {
+        await clerkSignOut({ redirectUrl: "/" });
+      }
+    } catch {
+      // ignore
+    }
+    clearStoredAuth();
+    await coreSignOut();
   };
 
   if (authStatus === "loading") {

@@ -6,4 +6,4 @@ out
 !.env.example
 test-results
 playwright-report
-
+powershell.cmd

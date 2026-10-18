@@ -13,6 +13,7 @@
     "verify": "npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
+    "@clerk/nextjs": "^5.7.5",
     "framer-motion": "^11.11.17",
     "lucide-react": "^0.468.0",
     "motion": "^14.3.0",

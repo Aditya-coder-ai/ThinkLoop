@@ -55,6 +55,14 @@ export function getStoredToken(): string | null {
 export function setStoredToken(token: string): void {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(AUTH_STORAGE_KEY, token);
+  try {
+    if (typeof document !== "undefined") {
+      const formattedToken = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
+      document.cookie = `thinkloop_auth_token=${encodeURIComponent(formattedToken)}; path=/; max-age=604800; SameSite=Lax`;
+    }
+  } catch {
+    // ignore
+  }
 }
 
 export function getStoredProfile(): AuthUser | null {

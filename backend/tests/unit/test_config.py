@@ -14,7 +14,6 @@ def test_missing_required_env_var_raises_error_naming_variable(
         "REDIS_URL",
         "AUTH_JWKS_URL",
         "AUTH_ISSUER",
-        "AUTH_AUDIENCE",
     ]:
         monkeypatch.delenv(var, raising=False)
 
@@ -30,7 +29,22 @@ def test_missing_required_env_var_raises_error_naming_variable(
     assert "redis_url" in missing_fields or "REDIS_URL" in missing_fields
     assert "auth_jwks_url" in missing_fields or "AUTH_JWKS_URL" in missing_fields
     assert "auth_issuer" in missing_fields or "AUTH_ISSUER" in missing_fields
-    assert "auth_audience" in missing_fields or "AUTH_AUDIENCE" in missing_fields
+
+
+def test_auth_audience_optional_for_clerk(monkeypatch: pytest.MonkeyPatch) -> None:
+    """AUTH_AUDIENCE is optional and defaults to empty string for Clerk."""
+    monkeypatch.setenv(
+        "DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/thinkloop"
+    )
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.setenv("AUTH_JWKS_URL", "https://auth.thinkloop.ai/.well-known/jwks.json")
+    monkeypatch.setenv("AUTH_ISSUER", "https://auth.thinkloop.ai")
+    monkeypatch.delenv("AUTH_AUDIENCE", raising=False)
+
+    from app.config import Settings
+
+    settings = Settings(_env_file=None)
+    assert settings.auth_audience == ""
 
 
 def test_valid_config_loads_with_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
