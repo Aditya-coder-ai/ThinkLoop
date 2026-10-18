@@ -97,6 +97,30 @@ backend/
     }
     ```
 
+## Post-Login Authentication & Lifecycle Rules
+1. **Backend Auth Gating**:
+   - Production path: Verify RS256 JWT via cached JWKS (`JWKSService.verify_token`).
+   - Dev token path (`dev_<name>`): Accepted ONLY when `AUTH_DEV_MODE=true` AND `ENVIRONMENT != "production"`.
+   - If `AUTH_DEV_MODE=true` while `ENVIRONMENT=production`, the application MUST refuse to boot on startup.
+   - Dev user IDs are derived deterministically (e.g. `uuid5`), and handles are length/charset-limited (no SQL/path/log injection).
+   - Never log tokens. Log user IDs only.
+2. **Session Bootstrap & Single Auth Store**:
+   - Central module in `frontend/lib/auth/` owns authentication state machine: `loading` -> `authenticated` | `unauthenticated` | `error`.
+   - On `/workspace` mount, render loading skeleton without flashing authenticated/unauthenticated UI. Call `GET /me`.
+   - If `200`: Reconcile server identity, overwrite cached profile, transition to `authenticated`.
+   - If `401`: Execute `clearAllUserState()`, redirect to `/?reason=expired`.
+   - If `5xx` / network error: Transition to `error` with backoff retry button (do NOT log user out, do NOT show another user's data).
+   - If cached user ID differs from server ID: Run `clearAllUserState()` before rendering anything.
+3. **User-Scoped Storage & Clean Sign-Out**:
+   - All user data keys must be namespaced `thinkloop:<userId>:<key>` or registered in `lib/auth/storageRegistry.ts`.
+   - `clearAllUserState()` purges all user-scoped keys, auth tokens, timers, and active streams.
+   - On sign-in, run `clearAllUserState()` first to prevent leftover data leakage between users.
+   - On sign-out: Abort in-flight requests, call `POST /backend-api/auth/logout` (2s timeout), run `clearAllUserState()`, broadcast logout across tabs via `BroadcastChannel`, and redirect to `/`.
+4. **Resilient Request Execution (`fetchWithAuth`)**:
+   - Single-flight 401 handling prevents duplicate sign-out cascades from concurrent failures.
+   - Epoch-based `AbortController`: Sign-out increments the epoch and aborts active requests. Responses arriving after sign-out are discarded.
+   - Surface 429 `Retry-After` without trigger storms.
+
 ## Definition of Done (DoD)
 - `make verify` passes from a clean checkout (lint, types, test, migration checks, content validation, retrieval eval, flashcards eval, video eval, battle sim).
 - All earlier phases pass without regression.

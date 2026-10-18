@@ -9,40 +9,39 @@ import {
 } from "./types";
 import { CURRICULUM_CONCEPTS, CURRICULUM_MISCONCEPTIONS } from "./curriculum";
 
+import {
+  fetchWithAuth as coreFetchWithAuth,
+  getStoredToken as coreGetStoredToken,
+  setStoredToken as coreSetStoredToken,
+  getStoredProfile,
+  setStoredProfile,
+  clearAllUserState,
+} from "../../lib/auth";
+
 const BACKEND_BASE = "/backend-api";
 const AUTH_STORAGE_KEY = "thinkloop_auth_token";
 const USER_STORAGE_KEY = "thinkloop_user_profile";
 
 export function getStoredToken(): string {
-  if (typeof window === "undefined") return "Bearer dev_learner";
-  return window.localStorage.getItem(AUTH_STORAGE_KEY) || "Bearer dev_learner";
+  return coreGetStoredToken() || "Bearer dev_learner";
 }
 
 export function setStoredToken(token: string): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(AUTH_STORAGE_KEY, token);
+  coreSetStoredToken(token);
 }
 
 export function getStoredUser(): UserProfile {
-  if (typeof window === "undefined") {
+  const profile = getStoredProfile();
+  if (profile) {
     return {
-      id: "u_dev_1",
-      authId: "dev_learner",
-      name: "Aditya",
-      email: "aditya@thinkloop.ai",
-      timezone: "UTC",
-      dailyGoalMinutes: 30,
-      voiceEnabled: true,
+      id: profile.id,
+      authId: profile.authId || profile.email?.split("@")[0] || "dev_learner",
+      name: profile.name,
+      email: profile.email || "aditya@thinkloop.ai",
+      timezone: profile.timezone || "UTC",
+      dailyGoalMinutes: profile.dailyGoalMinutes || 30,
+      voiceEnabled: profile.voiceEnabled ?? true,
     };
-  }
-
-  const raw = window.localStorage.getItem(USER_STORAGE_KEY);
-  if (raw) {
-    try {
-      return JSON.parse(raw);
-    } catch {
-      // fallback
-    }
   }
 
   const defaultUser: UserProfile = {
@@ -54,19 +53,16 @@ export function getStoredUser(): UserProfile {
     dailyGoalMinutes: 30,
     voiceEnabled: true,
   };
-  window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(defaultUser));
+  setStoredProfile(defaultUser);
   return defaultUser;
 }
 
 export function setStoredUser(user: UserProfile): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+  setStoredProfile(user);
 }
 
 export function clearStoredAuth(): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(AUTH_STORAGE_KEY);
-  window.localStorage.removeItem(USER_STORAGE_KEY);
+  clearAllUserState();
 }
 
 /**
@@ -74,7 +70,7 @@ export function clearStoredAuth(): void {
  */
 export async function fetchUserProfile(): Promise<UserProfile | null> {
   try {
-    const res = await fetchWithAuth("/me");
+    const res = await coreFetchWithAuth("/me");
     if (res.ok) {
       const data = await res.json();
       const current = getStoredUser();
@@ -97,21 +93,7 @@ export async function fetchUserProfile(): Promise<UserProfile | null> {
 // Live Backend Connectors with Graceful Fallback
 // -----------------------------------------------------------------------------
 
-async function fetchWithAuth(endpoint: string, options: RequestInit = {}): Promise<Response> {
-  const token = getStoredToken();
-  const headers = new Headers(options.headers || {});
-  if (!headers.has("Authorization")) {
-    headers.set("Authorization", token);
-  }
-  if (!headers.has("Content-Type") && options.body && typeof options.body === "string") {
-    headers.set("Content-Type", "application/json");
-  }
-
-  return fetch(`${BACKEND_BASE}${endpoint}`, {
-    ...options,
-    headers,
-  });
-}
+export const fetchWithAuth = coreFetchWithAuth;
 
 /**
  * Fetch live streak data from /streak or compute local streak

@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -41,6 +41,10 @@ class Settings(BaseSettings):
 
     # Optional configuration overrides
     environment: Literal["development", "staging", "production", "test"] = "development"
+    auth_dev_mode: bool = Field(
+        default=False,
+        description="Allow dev_<handle> tokens in non-production environments",
+    )
     log_level: str = "INFO"
     jwks_cache_ttl_seconds: int = 3600
     rate_limit_requests: int = 60
@@ -126,6 +130,13 @@ class Settings(BaseSettings):
         if not v or not v.strip():
             raise ValueError("DATABASE_URL must not be empty")
         return v.strip()
+
+    @model_validator(mode="after")
+    def validate_dev_mode_guard(self) -> "Settings":
+        """Refuse to run if auth_dev_mode is True in production."""
+        if self.auth_dev_mode and self.environment == "production":
+            raise ValueError("AUTH_DEV_MODE cannot be enabled in production environments.")
+        return self
 
     def __repr__(self) -> str:
         """Safe string representation that never exposes connection secrets."""

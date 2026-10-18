@@ -31,6 +31,12 @@ import {
   fetchCalendar,
   fetchConceptMastery,
 } from "./api";
+import {
+  authStore,
+  bootstrapSession,
+  signOut,
+  AuthStatus,
+} from "../../lib/auth";
 import { WorkspaceHeader } from "./components/WorkspaceHeader";
 import { SocraticChatView } from "./components/SocraticChatView";
 import { MasteryGraphView } from "./components/MasteryGraphView";
@@ -84,7 +90,10 @@ export default function WorkspacePage() {
     },
   ]);
 
-  // Load theme and telemetry on mount
+  const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  // Load theme and bootstrap session on mount
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("thinkloop-theme") as "light" | "dark" | null;
     const defaultTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -92,15 +101,44 @@ export default function WorkspacePage() {
     setTheme(currentTheme);
     document.documentElement.dataset.theme = currentTheme;
 
-    // Sync authenticated user profile from backend /me
-    fetchUserProfile().then((synced) => {
-      if (synced) setUser(synced);
+    const unsub = authStore.subscribe((s) => {
+      setAuthStatus(s.status);
+      setAuthError(s.error);
+      if (s.user) {
+        setUser({
+          id: s.user.id,
+          authId: s.user.authId || "dev_learner",
+          name: s.user.name,
+          email: s.user.email || "aditya@thinkloop.ai",
+          timezone: s.user.timezone || "UTC",
+          dailyGoalMinutes: s.user.dailyGoalMinutes || 30,
+          voiceEnabled: s.user.voiceEnabled ?? true,
+        });
+      }
     });
 
-    // Load streak and mastery
-    fetchStreak().then(setStreak);
-    fetchCalendar().then(setCalendarDays);
-    fetchConceptMastery().then(setMasteryList);
+    bootstrapSession().then((res) => {
+      setAuthStatus(res.status);
+      setAuthError(res.error);
+      if (res.status === "authenticated" && res.user) {
+        setUser({
+          id: res.user.id,
+          authId: res.user.authId || "dev_learner",
+          name: res.user.name,
+          email: res.user.email || "aditya@thinkloop.ai",
+          timezone: res.user.timezone || "UTC",
+          dailyGoalMinutes: res.user.dailyGoalMinutes || 30,
+          voiceEnabled: res.user.voiceEnabled ?? true,
+        });
+        fetchStreak().then(setStreak);
+        fetchCalendar().then(setCalendarDays);
+        fetchConceptMastery().then(setMasteryList);
+      }
+    });
+
+    return () => {
+      unsub();
+    };
   }, []);
 
   const toggleTheme = () => {
@@ -115,10 +153,36 @@ export default function WorkspacePage() {
     setStoredUser(updated);
   };
 
-  const handleSignOut = () => {
-    clearStoredAuth();
-    window.location.href = "/";
+  const handleSignOut = async () => {
+    await signOut();
   };
+
+  if (authStatus === "loading") {
+    return (
+      <div className="workspace-shell" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+        <div className="workspace-skeleton" style={{ textAlign: "center", padding: "40px" }}>
+          <div className="loading-spinner" style={{ margin: "0 auto 16px" }} />
+          <p style={{ color: "var(--ink-secondary)", fontSize: "14px" }}>Verifying session and loading workspace...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (authStatus === "error") {
+    return (
+      <div className="workspace-shell" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+        <div className="workspace-error-card" style={{ textAlign: "center", maxWidth: "440px", padding: "32px", border: "1px solid var(--line)", borderRadius: "12px", background: "var(--paper)" }}>
+          <h3 style={{ marginBottom: "8px" }}>Connection Issue</h3>
+          <p style={{ color: "var(--ink-secondary)", fontSize: "14px", marginBottom: "20px" }}>
+            {authError || "Unable to reach server. Please check your connection."}
+          </p>
+          <button className="button-primary" onClick={() => bootstrapSession()}>
+            Retry Connection
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const handleTurnCompleted = () => {
     // Each Socratic turn marks streak active and boosts mastery

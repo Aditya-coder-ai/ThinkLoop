@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Swords, Trophy, Clock, Check, X, Shield, ArrowRight, RotateCcw } from "lucide-react";
 import { BattleState, BattleRound } from "../types";
 import { SAMPLE_BATTLE_PROBLEMS } from "../curriculum";
+import { authStore } from "../../../lib/auth";
 
 interface Props {
   userRating: number;
@@ -68,6 +69,7 @@ export function BattleArenaView({ userRating, onBattleFinished }: Props) {
   // Round countdown timer
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
+    let timerId: number | null = null;
     if (battle.status === "in_progress" && !roundFeedback && roundTimeRemaining > 0) {
       timer = setInterval(() => {
         setRoundTimeRemaining((prev) => {
@@ -78,10 +80,15 @@ export function BattleArenaView({ userRating, onBattleFinished }: Props) {
           return prev - 1;
         });
       }, 1000);
+      timerId = timer as unknown as number;
+      authStore.registerActiveTimer(timerId, () => {
+        if (timer) clearInterval(timer);
+      });
     }
 
     return () => {
       if (timer) clearInterval(timer);
+      if (timerId !== null) authStore.unregisterActiveTimer(timerId);
     };
   }, [battle.status, roundFeedback, roundTimeRemaining, handleTimeExpired]);
 

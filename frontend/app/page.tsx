@@ -18,6 +18,7 @@ import {
   User,
 } from "lucide-react";
 import { ScrollProgressStroke } from "./components/ScrollProgressStroke";
+import { signIn } from "../lib/auth";
 
 const loopSteps = [
   {
@@ -150,17 +151,19 @@ export default function Home() {
   };
 
   const handleSignIn = (name: string) => {
+    const cleanName = (name || "Aditya").trim();
+    const sanitizedHandle = cleanName.toLowerCase().replace(/[^a-z0-9_-]/g, "_").slice(0, 32);
+    const authId = `dev_${sanitizedHandle}`;
     const userProfile = {
       id: "u_dev_1",
-      authId: `dev_${name.toLowerCase().replace(/\s+/g, "_")}`,
-      name: name || "Aditya",
-      email: `${name.toLowerCase().replace(/\s+/g, "_")}@thinkloop.ai`,
+      authId,
+      name: cleanName,
+      email: `${sanitizedHandle}@thinkloop.ai`,
       timezone: "UTC",
       dailyGoalMinutes: 30,
       voiceEnabled: true,
     };
-    window.localStorage.setItem("thinkloop_user_profile", JSON.stringify(userProfile));
-    window.localStorage.setItem("thinkloop_auth_token", `Bearer ${userProfile.authId}`);
+    signIn(authId, userProfile);
     window.location.href = "/workspace";
   };
 

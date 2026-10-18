@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from redis.asyncio import Redis
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.api.auth import router as auth_router
 from app.api.concepts import router as concepts_router
 from app.api.health import router as health_router
 from app.api.mastery import router as mastery_router
@@ -44,6 +45,9 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Instantiate and configure the FastAPI application."""
     app_settings = settings or get_settings()
+
+    if app_settings.auth_dev_mode and app_settings.environment == "production":
+        raise RuntimeError("AUTH_DEV_MODE cannot be enabled in production environments.")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -105,8 +109,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Centralized exception handlers
     setup_exception_handlers(app)
 
+    # Allow injected settings to be resolved by Depends(get_settings)
+    app.dependency_overrides[get_settings] = lambda: app_settings
+
     # Route registrations
     app.include_router(health_router)
+    app.include_router(auth_router)
     app.include_router(me_router)
     app.include_router(preferences_router)
     app.include_router(concepts_router)

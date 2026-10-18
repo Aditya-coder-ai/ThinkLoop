@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Play, Pause, Square, CheckCircle, RotateCcw, Coffee, BookOpen } from "lucide-react";
 import { ConceptItem, FocusSessionState } from "../types";
 import { CURRICULUM_CONCEPTS } from "../curriculum";
+import { authStore } from "../../../lib/auth";
 
 interface Props {
   onSessionCompleted: (minutes: number) => void;
@@ -23,6 +24,7 @@ export function FocusTimerView({ onSessionCompleted }: Props) {
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
+    let timerId: number | null = null;
     if (session.status === "running") {
       interval = setInterval(() => {
         setSession((prev) => {
@@ -37,10 +39,15 @@ export function FocusTimerView({ onSessionCompleted }: Props) {
           return { ...prev, elapsedSeconds: nextElapsed };
         });
       }, 1000);
+      timerId = interval as unknown as number;
+      authStore.registerActiveTimer(timerId, () => {
+        if (interval) clearInterval(interval);
+      });
     }
 
     return () => {
       if (interval) clearInterval(interval);
+      if (timerId !== null) authStore.unregisterActiveTimer(timerId);
     };
   }, [session.status]);
 

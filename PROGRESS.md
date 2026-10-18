@@ -219,3 +219,50 @@
    - `tests/integration/test_learner_api.py`: Learner profile, mastery, and auth protection.
    - `tests/integration/test_neon_live.py`: Non-destructive live test against real Neon database when `TEST_DATABASE_URL` is configured.
 
+---
+
+## Hardened Post-Login Lifecycle & Authentication Architecture
+
+### Status: Complete & Verified
+
+### 1. What Changed
+- **Backend Authentication Hardening (`backend/app/config.py`, `backend/app/main.py`, `backend/app/api/deps.py`, `backend/app/api/auth.py`)**:
+  - Added `auth_dev_mode: bool = False` to `Settings`.
+  - Added strict boot-time guard (`model_validator` in `Settings` and check in `create_app`): if `auth_dev_mode=True` when `environment="production"`, the application immediately raises `ValueError` / `RuntimeError` and refuses to start.
+  - In `app/api/deps.py`, dev tokens (`dev_<handle>`) are rejected with 401 (`DEV_MODE_DISABLED`) unless `auth_dev_mode=True` and `environment != "production"`.
+  - Dev handles are strictly sanitized (`^[a-zA-Z0-9_-]{1,64}$`), rejecting path traversal (`../`), quotes, newlines, and XSS syntax before reaching database queries or logs.
+  - Deterministic dev user UUIDs derived via `uuid.uuid5(uuid.NAMESPACE_DNS, f"thinkloop.dev.{dev_handle}")`.
+  - Added idempotent `POST /auth/logout` endpoint returning `204 No Content`, clearing auth cookies server-side.
+  - Verified zero token exposure across structured logs.
+
+- **Frontend Unified Auth Module (`frontend/lib/auth/`)**:
+  - `types.ts`: Defined `AuthStatus` (`loading` | `authenticated` | `unauthenticated` | `error`), `AuthUser`, `AuthState`, and `RedirectHandler`.
+  - `storageRegistry.ts`: Central registry for user-scoped storage keys, active intervals, and open SSE streams. `clearAllUserState()` cancels all active timers, aborts active streams, purges all registered keys, scans and deletes all keys matching `thinkloop:*` from `localStorage` and `sessionStorage`, and clears the auth cookie.
+  - `broadcast.ts`: Multi-tab synchronization over `BroadcastChannel("thinkloop_auth")` with `storage` event fallback. Dispatches and reacts to `"LOGOUT"` events across all open tabs.
+  - `authStore.ts`: Central state machine owning session state, single-flight 401 handling mutex (5 concurrent 401s produce exactly 1 sign-out and 1 redirect), epoch counter (bumped on sign-out/sign-in to abort in-flight requests and discard late responses), proactive JWT expiration scheduler, and bootstrap verification (`bootstrapSession`).
+  - `fetchWithAuth.ts`: Wraps `fetch` with credential attachment, epoch AbortController signal chaining, late-response discarding, 401 single-flight interception, and 429 Retry-After logging.
+
+- **Workspace & Page Lifecycle Integration**:
+  - `app/workspace/page.tsx`: Mounts with `authStatus === "loading"` displaying a skeleton loader (zero flash of unauthenticated or authed UI). Reconciles server profile on 200, cleans up and redirects on 401, displays connection error with backoff retry on 5xx/network errors without logging out. Cleans up upon sign-out via `signOut()`.
+  - `app/page.tsx`: Sign-in clears all prior user state first (`clearAllUserState()`), preventing data leakage across user switches.
+  - `app/workspace/api.ts`: Delegated all token, user profile, and `fetchWithAuth` operations to `lib/auth/`.
+  - `app/workspace/components/FocusTimerView.tsx` and `BattleArenaView.tsx`: Registered countdown timers with `authStore.registerActiveTimer` for guaranteed cancellation upon sign-out.
+  - `middleware.ts`: Next.js middleware guarding `/workspace` with cookie presence check and redirect to `/?reason=unauthenticated`.
+  - `next.config.mjs`: Added security headers (`X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY`, `Content-Security-Policy: frame-ancestors 'none'`) and `Cache-Control: no-store` on authed `/workspace` pages.
+
+### 2. Assumptions
+- During development and local testing, `AUTH_DEV_MODE=true` enables developer login via `dev_<handle>` with deterministic UUID5 identifiers.
+- In production environments, `AUTH_DEV_MODE=false` and authentications resolve via RS256 JWT tokens verified against the cached public JWKS endpoint.
+- The landing page sign-in sets `thinkloop_auth_token` in storage and cookie for fast-fail Next.js middleware checks; `bootstrapSession()` then verifies identity authoritatively with `GET /me`.
+
+### 3. Remaining Risks
+- **Token in cookie / storage**: In production with external identity providers (Clerk / Supabase), switching to httpOnly SameSite=Lax cookies issued by a Next.js BFF route handler eliminates XSS exposure completely.
+- **Rate Limiting on Dev**: Local SQLite testing uses fallback mocks for Redis when Redis is offline; production relies on live Redis sorted sets.
+
+### 4. Migration Path: Dev Auth to Clerk / Supabase
+1. Set `AUTH_DEV_MODE=false` in production environment.
+2. Configure `AUTH_JWKS_URL`, `AUTH_ISSUER`, and `AUTH_AUDIENCE` pointing to the Clerk or Supabase project (e.g. `https://<clerk-id>.clerk.accounts.dev/.well-known/jwks.json`).
+3. In the Next.js frontend, replace `signIn` in `frontend/lib/auth/` with the Clerk or Supabase SDK component/hook (`useClerk` / `supabase.auth.signInWithOAuth`).
+4. Pass the provider-issued session JWT to the backend via `fetchWithAuth` (or via httpOnly cookie through the Next.js API route proxy).
+5. Backend `get_current_user` in `app/api/deps.py` immediately validates the provider's RS256 signature, expiry, issuer, and audience against the cached JWKS with zero backend code modifications.
+

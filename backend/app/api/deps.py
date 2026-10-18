@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import re
+import uuid
 from collections.abc import AsyncGenerator, Callable
 from typing import TYPE_CHECKING, Any
 
@@ -69,16 +71,21 @@ def get_jwks_service(
 async def get_or_create_user(
     session: AsyncSession,
     payload: TokenPayload,
+    user_id: uuid.UUID | None = None,
 ) -> User:
     """Idempotently and race-safely fetch or create user by auth_id."""
     dialect_name = session.bind.dialect.name if session.bind else "postgresql"
+
+    insert_vals: dict[str, Any] = {"auth_id": payload.auth_id, "email": payload.email}
+    if user_id is not None:
+        insert_vals["id"] = user_id
 
     if dialect_name == "postgresql":
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
         stmt = (
             pg_insert(User)
-            .values(auth_id=payload.auth_id, email=payload.email)
+            .values(**insert_vals)
             .on_conflict_do_update(
                 index_elements=[User.auth_id],
                 set_={"email": payload.email, "updated_at": func.now()},
@@ -87,7 +94,11 @@ async def get_or_create_user(
         )
         result = await session.execute(stmt)
         user = result.scalar_one()
-        await session.commit()
+        if user_id is not None and user.id != user_id:
+            user.id = user_id
+            await session.commit()
+        else:
+            await session.commit()
         return user
     else:
         # SQLite dialect handling for local/test environments
@@ -95,7 +106,7 @@ async def get_or_create_user(
 
         stmt = (
             sqlite_insert(User)
-            .values(auth_id=payload.auth_id, email=payload.email)
+            .values(**insert_vals)
             .on_conflict_do_update(
                 index_elements=[User.auth_id],
                 set_={"email": payload.email, "updated_at": func.now()},
@@ -104,7 +115,11 @@ async def get_or_create_user(
         )
         result = await session.execute(stmt)
         user = result.scalar_one()
-        await session.commit()
+        if user_id is not None and user.id != user_id:
+            user.id = user_id
+            await session.commit()
+        else:
+            await session.commit()
         return user
 
 
@@ -129,14 +144,26 @@ async def get_current_user(
         )
 
     token = parts[1]
-    if settings.environment == "development" and token.startswith("dev_"):
-        auth_id = token
+    if token.startswith("dev_"):
+        if not settings.auth_dev_mode or settings.environment == "production":
+            raise AuthenticationError(
+                message="Dev mode authentication is disabled in this environment",
+                code="DEV_MODE_DISABLED",
+            )
+        dev_handle = token[4:]
+        if not re.match(r"^[a-zA-Z0-9_-]{1,64}$", dev_handle):
+            raise AuthenticationError(
+                message="Malformed dev username",
+                code="INVALID_DEV_TOKEN",
+            )
+        auth_id = f"dev_{dev_handle}"
+        dev_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, f"thinkloop.dev.{dev_handle}")
         payload = TokenPayload(
             auth_id=auth_id,
-            email=f"{auth_id}@thinkloop.ai",
+            email=f"{dev_handle}@thinkloop.ai",
             raw_claims={"sub": auth_id, "iss": settings.auth_issuer, "aud": settings.auth_audience},
         )
-        return await get_or_create_user(session=session, payload=payload)
+        return await get_or_create_user(session=session, payload=payload, user_id=dev_uuid)
 
     payload = await verify_token(
         token=token,
