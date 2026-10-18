@@ -4,3 +4,4 @@ node_modules
 out
 .env*
 !.env.example
+powershell.cmd

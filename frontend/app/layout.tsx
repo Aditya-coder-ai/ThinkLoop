@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import { SmoothCursor } from "@/components/ui/smooth-cursor";
 
@@ -10,11 +11,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" data-theme="light" suppressHydrationWarning>
-      <body>
-        <SmoothCursor />
-        {children}
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en" data-theme="light" suppressHydrationWarning>
+        <body>
+          <SmoothCursor />
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

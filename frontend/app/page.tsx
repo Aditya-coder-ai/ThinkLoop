@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   ArrowDown,
@@ -185,12 +186,24 @@ export default function Home() {
             {theme === "light" ? <Moon size={16} strokeWidth={1.8} /> : <Sun size={16} strokeWidth={1.8} />}
             <span>{theme === "light" ? "Night" : "Day"}</span>
           </button>
-          <button className="nav-cta cursor-pointer" onClick={() => setShowSignInModal(true)}>
-            Sign In
-          </button>
-          <a className="button button-primary" href="/workspace">
-            Enter Workspace <ArrowUpRight size={16} />
-          </a>
+          <SignedOut>
+            <a
+              href="/sign-in"
+              className="nav-cta cursor-pointer"
+              style={{ textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+            >
+              Sign In
+            </a>
+            <a className="button button-primary" href="/sign-up">
+              Get Started <ArrowUpRight size={16} />
+            </a>
+          </SignedOut>
+          <SignedIn>
+            <a className="button button-primary" href="/workspace">
+              Enter Workspace <ArrowUpRight size={16} />
+            </a>
+            <UserButton afterSignOutUrl="/" />
+          </SignedIn>
         </div>
       </nav>
 
