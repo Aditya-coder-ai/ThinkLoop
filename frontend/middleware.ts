@@ -2,9 +2,11 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 const isProtectedRoute = createRouteMatcher(["/workspace(.*)"]);
 
-export default clerkMiddleware(async (auth, req) => {
+export default clerkMiddleware((auth, req) => {
   if (isProtectedRoute(req)) {
-    await auth.protect();
+    if (!auth().userId) {
+      return auth().redirectToSignIn({ returnBackUrl: req.url });
+    }
   }
 });
 
