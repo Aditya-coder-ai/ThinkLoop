@@ -1,11 +1,13 @@
 """Live integration test suite for Neon PostgreSQL.
 
-Activated ONLY when TEST_DATABASE_URL is explicitly set.
+Activated when TEST_DATABASE_URL or Neon DATABASE_URL is set in environment or .env.
 Safely rolls back any test transactions and NEVER deletes or modifies production data.
 """
 
 import os
 import uuid
+from pathlib import Path
+from typing import Any
 
 import pytest
 from sqlalchemy import inspect, select
@@ -14,18 +16,37 @@ from app.db.models import Profile
 from app.db.session import create_engine, create_session_factory, ping_database
 
 
+def _resolve_neon_url() -> str | None:
+    """Find Neon connection URL from environment or .env files."""
+    if os.getenv("TEST_DATABASE_URL"):
+        return os.getenv("TEST_DATABASE_URL")
+
+    # Check .env in current and parent directories
+    for path in [Path(".env"), Path("backend/.env"), Path("../backend/.env")]:
+        if path.exists():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line.startswith("TEST_DATABASE_URL=") or (
+                    line.startswith("DATABASE_URL=") and "neon.tech" in line
+                ):
+                    val = line.split("=", 1)[1].strip().strip("'\"")
+                    if val and "neon.tech" in val:
+                        return val
+    return None
+
+
 @pytest.mark.asyncio
 async def test_live_neon_connectivity_and_schema() -> None:
     """Validate live connectivity and schema integrity against Neon PostgreSQL.
 
     Safety Guarantee:
-    - Skips automatically if TEST_DATABASE_URL is not set.
+    - Reads from TEST_DATABASE_URL or .env file.
     - Uses rollbacks for any write verification.
     - Zero data deletion.
     """
-    test_db_url = os.getenv("TEST_DATABASE_URL")
-    if not test_db_url:
-        pytest.skip("TEST_DATABASE_URL not set; skipping live Neon database test.")
+    test_db_url = _resolve_neon_url()
+    if not test_db_url or "neon.tech" not in test_db_url:
+        pytest.skip("No live Neon database URL found; skipping live Neon test.")
 
     engine = create_engine(test_db_url)
 
@@ -35,8 +56,8 @@ async def test_live_neon_connectivity_and_schema() -> None:
 
     # 2. Verify schema tables and expected columns
     async with engine.connect() as conn:
-        # Check required tables
-        def _inspect_tables(connection):
+
+        def _inspect_tables(connection: Any) -> set[str]:
             insp = inspect(connection)
             return set(insp.get_table_names())
 
@@ -50,7 +71,7 @@ async def test_live_neon_connectivity_and_schema() -> None:
         )
 
         # Verify columns on profiles
-        def _inspect_profiles_cols(connection):
+        def _inspect_profiles_cols(connection: Any) -> set[str]:
             insp = inspect(connection)
             return {c["name"] for c in insp.get_columns("profiles")}
 
@@ -67,7 +88,7 @@ async def test_live_neon_connectivity_and_schema() -> None:
         assert not missing_p_cols, f"Missing columns in profiles: {missing_p_cols}"
 
         # Verify columns on learner_mastery
-        def _inspect_mastery_cols(connection):
+        def _inspect_mastery_cols(connection: Any) -> set[str]:
             insp = inspect(connection)
             return {c["name"] for c in insp.get_columns("learner_mastery")}
 
@@ -91,11 +112,11 @@ async def test_live_neon_connectivity_and_schema() -> None:
 
     async with session_factory() as session:
         try:
-            # Test profile insert inside transaction
+            # Test profile insert inside transaction with valid learning_level
             profile = Profile(
                 user_id=test_user_id,
                 display_name="Ephemeral Test Learner",
-                learning_level="Test Level",
+                learning_level="beginner",
             )
             session.add(profile)
             await session.flush()
