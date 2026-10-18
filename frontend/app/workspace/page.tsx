@@ -25,6 +25,8 @@ import { CURRICULUM_CONCEPTS } from "./curriculum";
 import {
   getStoredUser,
   setStoredUser,
+  clearStoredAuth,
+  fetchUserProfile,
   fetchStreak,
   fetchCalendar,
   fetchConceptMastery,
@@ -90,6 +92,11 @@ export default function WorkspacePage() {
     setTheme(currentTheme);
     document.documentElement.dataset.theme = currentTheme;
 
+    // Sync authenticated user profile from backend /me
+    fetchUserProfile().then((synced) => {
+      if (synced) setUser(synced);
+    });
+
     // Load streak and mastery
     fetchStreak().then(setStreak);
     fetchCalendar().then(setCalendarDays);
@@ -109,6 +116,7 @@ export default function WorkspacePage() {
   };
 
   const handleSignOut = () => {
+    clearStoredAuth();
     window.location.href = "/";
   };
 

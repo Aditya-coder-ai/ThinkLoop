@@ -63,6 +63,36 @@ export function setStoredUser(user: UserProfile): void {
   window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
 }
 
+export function clearStoredAuth(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(AUTH_STORAGE_KEY);
+  window.localStorage.removeItem(USER_STORAGE_KEY);
+}
+
+/**
+ * Fetch and sync user profile from backend /me
+ */
+export async function fetchUserProfile(): Promise<UserProfile | null> {
+  try {
+    const res = await fetchWithAuth("/me");
+    if (res.ok) {
+      const data = await res.json();
+      const current = getStoredUser();
+      const updated: UserProfile = {
+        ...current,
+        id: data.id,
+        email: data.email,
+        authId: current.authId || data.email.split("@")[0],
+      };
+      setStoredUser(updated);
+      return updated;
+    }
+  } catch {
+    // backend offline or in dev fallback
+  }
+  return null;
+}
+
 // -----------------------------------------------------------------------------
 // Live Backend Connectors with Graceful Fallback
 // -----------------------------------------------------------------------------
