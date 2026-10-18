@@ -61,13 +61,24 @@ function setupBackendRoutes(context: BrowserContext) {
 async function signInAs(page: Page, name: string = "Aditya") {
   await page.goto("/");
   const signInBtn = page.getByRole("button", { name: /sign in/i });
+  await expect(signInBtn).toBeVisible();
   await signInBtn.click();
 
   if (name === "Aditya") {
     const continueBtn = page.getByRole("button", { name: /continue as aditya/i });
+    if (!(await continueBtn.isVisible())) {
+      await page.waitForTimeout(150);
+      await signInBtn.click();
+    }
+    await expect(continueBtn).toBeVisible();
     await continueBtn.click();
   } else {
     const input = page.getByPlaceholder(/enter your name/i);
+    if (!(await input.isVisible())) {
+      await page.waitForTimeout(150);
+      await signInBtn.click();
+    }
+    await expect(input).toBeVisible();
     await input.fill(name);
     const enterBtn = page.getByRole("button", { name: /^enter$/i });
     await enterBtn.click();
@@ -211,5 +222,42 @@ test.describe("Post-Login Authentication & Session Lifecycle E2E", () => {
     ]);
 
     expect(page.url()).toContain("reason=expired");
+  });
+
+  test("/sign-up loads instantly without hanging on external domains and allows 1-click workspace entry", async ({ page }) => {
+    const startTime = Date.now();
+    await page.goto("/sign-up");
+    const loadDuration = Date.now() - startTime;
+
+    // Must load promptly without hanging for 30-60s
+    expect(loadDuration).toBeLessThan(5000);
+
+    // Verify fallback card is visible with proper heading and options
+    await expect(page.getByText(/get started with thinkloop/i)).toBeVisible();
+    await expect(page.getByText(/local dev mode/i)).toBeVisible();
+
+    // Click Continue as Demo Learner
+    const continueBtn = page.getByRole("button", { name: /continue as/i });
+    await continueBtn.click();
+
+    // Should navigate into /workspace
+    await page.waitForURL(/\/workspace/);
+    await expect(page.locator(".workspace-shell")).toBeVisible();
+  });
+
+  test("/sign-in loads instantly and allows return to home", async ({ page }) => {
+    const startTime = Date.now();
+    await page.goto("/sign-in");
+    const loadDuration = Date.now() - startTime;
+
+    expect(loadDuration).toBeLessThan(5000);
+    await expect(page.getByText(/sign in to thinkloop/i)).toBeVisible();
+
+    // Click Back to Home
+    const backBtn = page.getByRole("link", { name: /back to home/i });
+    await backBtn.click();
+
+    await page.waitForURL((url) => url.pathname === "/");
+    await expect(page).toHaveURL(/\//);
   });
 });

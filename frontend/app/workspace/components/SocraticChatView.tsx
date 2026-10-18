@@ -1,9 +1,15 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, BookOpen, MessageSquare, ChevronDown } from "lucide-react";
-import { ConceptItem, TurnMessage } from "../types";
-import { CURRICULUM_CONCEPTS } from "../curriculum";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { Send, Sparkles, BookOpen, ChevronDown, RotateCcw } from "lucide-react";
+import { ConceptItem, TurnMessage, StrategyKind } from "../types";
+import { CURRICULUM_CONCEPTS, CURRICULUM_MISCONCEPTIONS } from "../curriculum";
+import {
+  createSession,
+  getSession,
+  streamTurnMessage,
+  sendTurnMessage,
+} from "../api";
 import { CognitiveDiagnosticPanel } from "./CognitiveDiagnosticPanel";
 
 interface Props {
@@ -13,40 +19,133 @@ interface Props {
   onTurnCompleted: () => void;
 }
 
+function getConceptOpener(concept: ConceptItem): string {
+  switch (concept.id) {
+    case "newtons_first_law":
+      return `Welcome to our session on **${concept.title}**!\n\n${concept.description}\n\nTo begin: Imagine a spacecraft gliding through deep interstellar space where there is no air, friction, or gravity. If its engines have been turned off for years, what keeps it moving forward, and what forces are acting on it?`;
+    case "universal_gravitation":
+      return `Welcome to our session on **${concept.title}**!\n\n${concept.description}\n\nTo begin: The Earth pulls down on an apple with gravitational force. According to gravitational law, does the apple pull upward on the Earth with any force, and how do their magnitudes compare?`;
+    case "work_and_kinetic_energy":
+      return `Welcome to our session on **${concept.title}**!\n\n${concept.description}\n\nTo begin: If you push with all your strength against a solid stone wall for an hour without it moving a millimeter, have you done physical work on the wall? Why or why not?`;
+    case "acceleration":
+      return `Welcome to our session on **${concept.title}**!\n\n${concept.description}\n\nTo begin: When you throw a ball straight up into the air, it reaches a peak where its velocity is momentarily zero. What is its acceleration at that exact moment?`;
+    case "newtons_third_law":
+      return `Welcome to our session on **${concept.title}**!\n\n${concept.description}\n\nTo begin: When a massive truck and a compact car collide head-on, does the truck exert a greater force on the car, or does the car exert an equal force on the truck?`;
+    case "free_body_diagrams":
+      return `Welcome to our session on **${concept.title}**!\n\n${concept.description}\n\nTo begin: Consider a heavy textbook resting quietly on a flat wooden desk. What are all the forces acting directly ON the book, and how do they balance?`;
+    case "friction_static_and_kinetic":
+      return `Welcome to our session on **${concept.title}**!\n\n${concept.description}\n\nTo begin: Why does it require significantly more force to start sliding a heavy wardrobe from rest than to keep it sliding across the floor?`;
+    case "linear_momentum_and_impulse":
+      return `Welcome to our session on **${concept.title}**!\n\n${concept.description}\n\nTo begin: Why do modern cars have crumple zones and airbags instead of completely rigid steel frames? How does extending collision duration protect passengers?`;
+    default:
+      return `Welcome to our session on **${concept.title}**!\n\n${concept.description}\n\nTo begin our exploration: In your own words, what key physical relationship or principle governs ${concept.title}?`;
+  }
+}
+
+function getExplorePrompts(concept: ConceptItem): string[] {
+  switch (concept.id) {
+    case "newtons_first_law":
+      return [
+        "What forces act on it once it starts moving?",
+        "I think continuous motion requires a continuous force.",
+        "Without friction, it glides forever at constant speed.",
+      ];
+    case "universal_gravitation":
+      return [
+        "Does Earth pull harder on the Moon than the Moon on Earth?",
+        "Why do astronauts on the space station feel weightless?",
+        "How does gravitational pull change if distance doubles?",
+      ];
+    case "work_and_kinetic_energy":
+      return [
+        "Is work done if an object does not displace?",
+        "Why does stopping distance quadruple when speed doubles?",
+        "Can work done by a force be negative?",
+      ];
+    case "acceleration":
+      return [
+        "Is acceleration zero at the peak of flight?",
+        "Can velocity be negative while acceleration is positive?",
+        "What is the difference between speed and acceleration?",
+      ];
+    case "newtons_third_law":
+      return [
+        "Why don't action and reaction forces cancel out?",
+        "If forces are equal, why does the smaller object accelerate more?",
+        "How does a rocket accelerate in the vacuum of space?",
+      ];
+    case "friction_static_and_kinetic":
+      return [
+        "Why is static friction greater than kinetic friction?",
+        "Does friction always oppose motion or can it cause it?",
+        "How does the normal force affect friction?",
+      ];
+    default:
+      return [
+        `What are the external forces in ${concept.title}?`,
+        `How does mass affect this relationship?`,
+        `What happens in an idealized, frictionless scenario?`,
+      ];
+  }
+}
+
 export function SocraticChatView({
   activeConcept,
   onSelectConcept,
   onLogDoubtFromChat,
   onTurnCompleted,
 }: Props) {
-  const [messages, setMessages] = useState<TurnMessage[]>([
-    {
-      id: "turn_welcome",
-      role: "tutor",
-      content: `Welcome to our session on **${activeConcept.title}**!\n\n${activeConcept.description}\n\nTo begin: Imagine a hockey puck sliding across a vast sheet of ice. If you give it one quick tap and let go, what keeps it moving forward, and what forces are acting on it as it glides?`,
-      createdAt: "Just now",
-      strategy: "guided_hint",
-      diagnosis: {
-        isCorrect: true,
-        confidence: 0.95,
-        reasoning: "Session initialization prompt",
-        verifiedMath: true,
-      },
-    },
-  ]);
-
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<TurnMessage[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [masteryPct, setMasteryPct] = useState(0.58);
-  const [currentStrategy, setCurrentStrategy] = useState<any>("guided_hint");
+  const [masteryPct, setMasteryPct] = useState(0.45);
+  const [currentStrategy, setCurrentStrategy] = useState<StrategyKind>("guided_hint");
   const [detectedMiscId, setDetectedMiscId] = useState<string | undefined>(undefined);
   const [showConceptDropdown, setShowConceptDropdown] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
   }, [messages, isTyping]);
+
+  // Initialize or resume session whenever activeConcept changes
+  const initSession = useCallback(async (concept: ConceptItem) => {
+    setMessages([
+      {
+        id: `welcome_${concept.id}`,
+        role: "tutor",
+        content: getConceptOpener(concept),
+        createdAt: "Just now",
+        strategy: "guided_hint",
+        diagnosis: {
+          isCorrect: true,
+          confidence: 0.95,
+          reasoning: "Session initialization prompt",
+          verifiedMath: true,
+        },
+      },
+    ]);
+    setCurrentStrategy("guided_hint");
+    setDetectedMiscId(undefined);
+
+    try {
+      const newSessionId = await createSession(concept.id);
+      setSessionId(newSessionId);
+    } catch (err) {
+      console.warn("Failed to create session on backend:", err);
+      setSessionId(`session_local_${Date.now()}`);
+    }
+  }, []);
+
+  useEffect(() => {
+    initSession(activeConcept);
+  }, [activeConcept, initSession]);
 
   const handleSend = async (textToSend?: string) => {
     const text = (textToSend || input).trim();
@@ -56,78 +155,171 @@ export function SocraticChatView({
       id: `learner_${Date.now()}`,
       role: "learner",
       content: text,
-      createdAt: "Just now",
+      createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setIsTyping(true);
 
-    // Call Socratic turn
-    setTimeout(() => {
-      // Analyze learner answer
-      const lower = text.toLowerCase();
-      let reply = "";
-      let newStrat: any = "guided_hint";
-      let misc: string | undefined = undefined;
-      let newMastery = masteryPct;
+    const tutorMsgId = `tutor_${Date.now()}`;
+    let streamedContent = "";
+    let hasAddedTutorMessage = false;
 
-      if (
-        lower.includes("force keeps it moving") ||
-        lower.includes("needs force") ||
-        lower.includes("stops without a push") ||
-        lower.includes("engine force")
-      ) {
-        misc = "misc_motion_requires_force";
-        newStrat = "cognitive_conflict";
-        newMastery = Math.max(0.2, newMastery - 0.08);
-        reply =
-          "That was common sense for centuries! Aristotle thought the exact same thing. But when the puck is gliding across the ice and your hand is no longer touching it, what object is physically applying that forward force?";
-      } else if (lower.includes("friction") && (lower.includes("gravity") || lower.includes("normal"))) {
-        newStrat = "socratic_challenge";
-        newMastery = Math.min(0.95, newMastery + 0.12);
-        reply =
-          "Excellent observation! Gravity pulls downward, the ice pushes upward with a normal force, and friction opposes the motion horizontally. Now, if the ice were perfectly frictionless with zero air resistance, when would the puck come to a stop?";
-      } else if (lower.includes("never") || lower.includes("forever") || lower.includes("constant velocity")) {
-        newStrat = "socratic_challenge";
-        newMastery = Math.min(0.95, newMastery + 0.15);
-        reply =
-          "Spot on. That is the essence of Newton's First Law (Inertia): an object in motion stays in motion with constant velocity unless an unbalanced external force acts on it. You've isolated the core principle!";
-      } else {
-        newStrat = "guided_hint";
-        newMastery = Math.min(0.95, newMastery + 0.05);
-        reply =
-          "You're circling the right physical intuition. Think about contact: once your stick leaves the puck, the only horizontal force is friction from the ice. Does friction cause the motion, or oppose it?";
-      }
+    const activeSession = sessionId || (await createSession(activeConcept.id));
+    if (!sessionId) {
+      setSessionId(activeSession);
+    }
 
-      setDetectedMiscId(misc);
-      setCurrentStrategy(newStrat);
-      setMasteryPct(newMastery);
+    try {
+      let receivedAnyToken = false;
 
-      const tutorMsg: TurnMessage = {
-        id: `tutor_${Date.now()}`,
-        role: "tutor",
-        content: reply,
-        createdAt: "Just now",
-        strategy: newStrat,
-        diagnosis: {
-          isCorrect: !misc,
-          confidence: 0.91,
-          misconceptionId: misc,
-          reasoning: misc ? "Identified motion requires force misconception" : "Sound Newton's 1st law logic",
-          verifiedMath: true,
+      await streamTurnMessage(activeSession, text, {
+        onToken: (token) => {
+          receivedAnyToken = true;
+          streamedContent += token;
+          if (!hasAddedTutorMessage) {
+            hasAddedTutorMessage = true;
+            setIsTyping(false);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: tutorMsgId,
+                role: "tutor",
+                content: streamedContent,
+                createdAt: "Just now",
+                strategy: currentStrategy,
+              },
+            ]);
+          } else {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === tutorMsgId ? { ...m, content: streamedContent } : m
+              )
+            );
+          }
         },
-      };
+        onStrategy: (strategy) => {
+          const kind = strategy as StrategyKind;
+          setCurrentStrategy(kind);
+          setMessages((prev) =>
+            prev.map((m) => (m.id === tutorMsgId ? { ...m, strategy: kind } : m))
+          );
+        },
+        onMastery: (update) => {
+          if (typeof update.new === "number") {
+            setMasteryPct(update.new);
+          }
+        },
+        onDone: (data) => {
+          setIsTyping(false);
+          if (data.strategy) {
+            setCurrentStrategy(data.strategy as StrategyKind);
+          }
+          onTurnCompleted();
+        },
+        onError: (err) => {
+          console.warn("SSE stream reported error:", err);
+        },
+      });
 
-      setMessages((prev) => [...prev, tutorMsg]);
-      setIsTyping(false);
-      onTurnCompleted();
-    }, 1100);
+      // If stream completed but delivered empty text (e.g. test environment or blank stream)
+      if (!receivedAnyToken || !streamedContent.trim()) {
+        const fallback = await sendTurnMessage(activeSession, activeConcept.id, text);
+        setMessages((prev) => {
+          const exists = prev.some((m) => m.id === tutorMsgId);
+          if (exists) {
+            return prev.map((m) =>
+              m.id === tutorMsgId
+                ? {
+                    ...m,
+                    content: fallback.content,
+                    strategy: fallback.strategy,
+                    diagnosis: fallback.diagnosis,
+                  }
+                : m
+            );
+          }
+          return [
+            ...prev,
+            {
+              id: tutorMsgId,
+              role: "tutor",
+              content: fallback.content,
+              createdAt: "Just now",
+              strategy: fallback.strategy,
+              diagnosis: fallback.diagnosis,
+            },
+          ];
+        });
+        if (fallback.strategy) {
+          setCurrentStrategy(fallback.strategy);
+        }
+        if (fallback.diagnosis?.misconceptionId) {
+          setDetectedMiscId(fallback.diagnosis.misconceptionId);
+        }
+        setIsTyping(false);
+        onTurnCompleted();
+      }
+    } catch (streamErr) {
+      console.warn("Backend stream failed, using resilient fallback:", streamErr);
+      try {
+        const fallback = await sendTurnMessage(activeSession, activeConcept.id, text);
+        setMessages((prev) => {
+          const exists = prev.some((m) => m.id === tutorMsgId);
+          if (exists) {
+            return prev.map((m) =>
+              m.id === tutorMsgId
+                ? {
+                    ...m,
+                    content: fallback.content,
+                    strategy: fallback.strategy,
+                    diagnosis: fallback.diagnosis,
+                  }
+                : m
+            );
+          }
+          return [
+            ...prev,
+            {
+              id: tutorMsgId,
+              role: "tutor",
+              content: fallback.content,
+              createdAt: "Just now",
+              strategy: fallback.strategy,
+              diagnosis: fallback.diagnosis,
+            },
+          ];
+        });
+        if (fallback.strategy) {
+          setCurrentStrategy(fallback.strategy);
+        }
+        if (fallback.diagnosis?.misconceptionId) {
+          setDetectedMiscId(fallback.diagnosis.misconceptionId);
+        }
+      } catch {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: tutorMsgId,
+            role: "tutor",
+            content:
+              "Let's reflect on that. What forces are acting upon the object in this scenario?",
+            createdAt: "Just now",
+          },
+        ]);
+      } finally {
+        setIsTyping(false);
+        onTurnCompleted();
+      }
+    }
   };
 
   const handleQuickPrompt = (prompt: string) => {
     handleSend(prompt);
   };
+
+  const explorePrompts = getExplorePrompts(activeConcept);
 
   return (
     <div className="socratic-workspace">
@@ -158,16 +350,6 @@ export function SocraticChatView({
                     onClick={() => {
                       onSelectConcept(c);
                       setShowConceptDropdown(false);
-                      setMessages([
-                        {
-                          id: `turn_welcome_${c.id}`,
-                          role: "tutor",
-                          content: `Switched focus to **${c.title}**.\n\n${c.description}\n\nLet's test our understanding: What key relationship distinguishes this idea?`,
-                          createdAt: "Just now",
-                          strategy: "guided_hint",
-                          diagnosis: { isCorrect: true, confidence: 0.9, verifiedMath: true },
-                        },
-                      ]);
                     }}
                   >
                     <div>
@@ -184,6 +366,14 @@ export function SocraticChatView({
           <div className="concept-meta">
             <span className="domain-pill">Mechanics</span>
             <span className="difficulty-tag">Difficulty {activeConcept.difficulty}/3</span>
+            <button
+              className="button-ghost icon-button"
+              onClick={() => initSession(activeConcept)}
+              title="Reset conversation for this concept"
+              aria-label="Reset session"
+            >
+              <RotateCcw size={14} />
+            </button>
           </div>
         </div>
 
@@ -212,15 +402,19 @@ export function SocraticChatView({
                 </div>
 
                 <div className="bubble-body">
-                  {msg.content.split("\n\n").map((para, i) => (
-                    <p key={i}>{para}</p>
-                  ))}
+                  {msg.content ? (
+                    msg.content.split("\n\n").map((para, i) => (
+                      <p key={i}>{para}</p>
+                    ))
+                  ) : (
+                    <span className="typing-dot-stream">Thinking...</span>
+                  )}
                 </div>
 
                 {msg.role === "tutor" && msg.strategy && (
                   <div className="bubble-footer-badge">
                     <Sparkles size={12} className="text-olive" />
-                    <span>Strategy: {msg.strategy.replace("_", " ")}</span>
+                    <span>Strategy: {msg.strategy.replace(/_/g, " ")}</span>
                   </div>
                 )}
               </div>
@@ -249,24 +443,15 @@ export function SocraticChatView({
         {/* Quick Suggestion Pills */}
         <div className="quick-suggestions-row">
           <span className="suggestions-label">Explore thinking:</span>
-          <button
-            className="suggestion-pill"
-            onClick={() => handleQuickPrompt("What forces act on it once it starts moving?")}
-          >
-            &ldquo;What forces act on it once it moves?&rdquo;
-          </button>
-          <button
-            className="suggestion-pill"
-            onClick={() => handleQuickPrompt("I think you need a constant force to keep it going.")}
-          >
-            &ldquo;I think continuous motion needs a force&rdquo;
-          </button>
-          <button
-            className="suggestion-pill"
-            onClick={() => handleQuickPrompt("Without friction, it would glide forever at constant speed.")}
-          >
-            &ldquo;Without friction, it glides forever&rdquo;
-          </button>
+          {explorePrompts.map((prompt, idx) => (
+            <button
+              key={idx}
+              className="suggestion-pill"
+              onClick={() => handleQuickPrompt(prompt)}
+            >
+              &ldquo;{prompt}&rdquo;
+            </button>
+          ))}
         </div>
 
         {/* Message Input Bar */}

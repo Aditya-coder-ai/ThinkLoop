@@ -154,11 +154,22 @@ async def post_message(
 
     # 2. Acquire Redis distributed lock (enforce single in-flight turn per session)
     lock_key = f"chat:lock:{session_id}"
-    acquired = await redis.set(lock_key, "1", nx=True, ex=60)
-    if not acquired:
-        raise ConflictError(
-            message="A message turn is already in-flight for this session",
-            code="CONFLICT",
+    lock_acquired = False
+    try:
+        acquired = await redis.set(lock_key, "1", nx=True, ex=60)
+        if not acquired:
+            raise ConflictError(
+                message="A message turn is already in-flight for this session",
+                code="CONFLICT",
+            )
+        lock_acquired = True
+    except ConflictError:
+        raise
+    except Exception as exc:
+        logger.warning(
+            "Redis unavailable during chat turn lock acquisition for session_id=%s: %s. Failing open.",
+            session_id,
+            exc,
         )
 
     # 3. Log metadata without raw learner message content
@@ -173,7 +184,11 @@ async def post_message(
     concept_stmt = select(Concept).where(Concept.id == session.concept_id)
     concept = (await db.execute(concept_stmt)).scalar_one_or_none()
     if not concept:
-        await redis.delete(lock_key)
+        if lock_acquired:
+            try:
+                await redis.delete(lock_key)
+            except Exception:
+                pass
         raise NotFoundError(
             message=f"Concept '{session.concept_id}' not found",
             code="NOT_FOUND",
@@ -199,8 +214,12 @@ async def post_message(
             await turn_gen.aclose()
             raise
         finally:
-            await redis.delete(lock_key)
-            logger.info("Released turn lock for session_id=%s", session.id)
+            if lock_acquired:
+                try:
+                    await redis.delete(lock_key)
+                    logger.info("Released turn lock for session_id=%s", session.id)
+                except Exception as exc:
+                    logger.warning("Failed to release Redis turn lock: %s", exc)
 
     return StreamingResponse(
         event_generator(),

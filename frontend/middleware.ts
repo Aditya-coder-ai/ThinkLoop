@@ -5,7 +5,10 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 const isProtectedRoute = createRouteMatcher(["/workspace(.*)"]);
 
 const hasClerkKeys = Boolean(
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || process.env.CLERK_SECRET_KEY
+  (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY !== "pk_test_Y2xlcmsuZXhhbXBsZS5jb20k" &&
+    !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.includes("example.com")) ||
+    (process.env.CLERK_SECRET_KEY && !process.env.CLERK_SECRET_KEY.includes("example"))
 );
 
 export default hasClerkKeys

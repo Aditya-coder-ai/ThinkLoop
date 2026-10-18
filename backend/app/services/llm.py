@@ -319,3 +319,204 @@ class AnthropicClient:
             raise LLMTimeoutError(f"Anthropic streaming timed out after {self._timeout}s") from e
         except Exception as e:
             raise LLMError(f"Anthropic streaming failed: {e}") from e
+
+
+class GeminiClient:
+    """Async Google Gemini client implementing LLMClient protocol for Socratic tutoring."""
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        default_model: str = "gemini-3.8-flash",
+        fast_model: str = "gemini-3.8-flash",
+        strong_model: str = "gemini-3.8-flash",
+        timeout: float = 30.0,
+    ) -> None:
+        self._api_key = api_key or ""
+        self._default_model = default_model
+        self.fast_model = fast_model
+        self.strong_model = strong_model
+        self._timeout = timeout
+        self._base_url = "https://generativelanguage.googleapis.com/v1beta/models"
+
+    def _convert_schema_to_gemini(self, schema: dict[str, Any]) -> dict[str, Any]:
+        """Convert standard JSON Schema / Anthropic input schema to Gemini schema."""
+        if not isinstance(schema, dict):
+            return schema
+
+        converted: dict[str, Any] = {}
+        raw_type = schema.get("type")
+        if isinstance(raw_type, list):
+            valid_types = [t.upper() for t in raw_type if t != "null"]
+            converted["type"] = valid_types[0] if valid_types else "STRING"
+        elif isinstance(raw_type, str):
+            type_map = {
+                "object": "OBJECT",
+                "string": "STRING",
+                "number": "NUMBER",
+                "integer": "INTEGER",
+                "boolean": "BOOLEAN",
+                "array": "ARRAY",
+            }
+            converted["type"] = type_map.get(raw_type.lower(), raw_type.upper())
+
+        if "description" in schema:
+            converted["description"] = schema["description"]
+        if "enum" in schema:
+            converted["enum"] = [str(e) for e in schema["enum"] if e is not None]
+        if "properties" in schema:
+            converted["properties"] = {
+                k: self._convert_schema_to_gemini(v)
+                for k, v in schema["properties"].items()
+            }
+        if "required" in schema:
+            converted["required"] = schema["required"]
+        if "items" in schema:
+            converted["items"] = self._convert_schema_to_gemini(schema["items"])
+
+        return converted
+
+    def _format_messages_for_gemini(
+        self, messages: list[LLMMessage], system: str | None = None
+    ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+        """Format messages and system instructions for Gemini REST API."""
+        system_instruction = None
+        if system:
+            system_instruction = {"parts": [{"text": system}]}
+
+        contents: list[dict[str, Any]] = []
+        for m in messages:
+            if m.role == "system":
+                if not system_instruction:
+                    system_instruction = {"parts": [{"text": m.content}]}
+                continue
+            role = "user" if m.role == "user" else "model"
+            contents.append({"role": role, "parts": [{"text": m.content}]})
+
+        if not contents:
+            contents.append({"role": "user", "parts": [{"text": "Hello"}]})
+
+        return system_instruction, contents
+
+    async def complete(
+        self,
+        messages: list[LLMMessage],
+        system: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        tool_choice: dict[str, Any] | None = None,
+        model: str | None = None,
+    ) -> LLMResult:
+        """Execute completion with tool calling using Gemini API."""
+        import httpx
+
+        model_name = "gemini-3.8-flash"
+        url = f"{self._base_url}/{model_name}:generateContent?key={self._api_key}"
+
+        system_instruction, contents = self._format_messages_for_gemini(messages, system)
+        payload: dict[str, Any] = {"contents": contents}
+        if system_instruction:
+            payload["system_instruction"] = system_instruction
+
+        if tools:
+            gemini_tools = []
+            for t in tools:
+                tool_name = t.get("name", "")
+                tool_desc = t.get("description", "")
+                raw_schema = t.get("input_schema") or t.get("parameters") or {}
+                gemini_schema = self._convert_schema_to_gemini(raw_schema)
+                gemini_tools.append({
+                    "name": tool_name,
+                    "description": tool_desc,
+                    "parameters": gemini_schema,
+                })
+            payload["tools"] = [{"function_declarations": gemini_tools}]
+            if tool_choice:
+                payload["tool_config"] = {"function_calling_config": {"mode": "ANY"}}
+
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.post(url, json=payload)
+                if resp.status_code != 200:
+                    raise LLMError(f"Gemini API error ({resp.status_code}): {resp.text}")
+                data = resp.json()
+        except httpx.TimeoutException as e:
+            raise LLMTimeoutError(f"Gemini API timed out: {e}") from e
+        except Exception as e:
+            if isinstance(e, (LLMError, LLMTimeoutError)):
+                raise
+            raise LLMError(f"Gemini request failed: {e}") from e
+
+        content_text = ""
+        tool_calls: list[dict[str, Any]] = []
+
+        candidates = data.get("candidates", [])
+        if candidates:
+            parts = candidates[0].get("content", {}).get("parts", [])
+            for p in parts:
+                if "text" in p:
+                    content_text += p["text"]
+                if "functionCall" in p:
+                    fc = p["functionCall"]
+                    tool_calls.append({
+                        "name": fc.get("name", ""),
+                        "input": fc.get("args", {}),
+                    })
+
+        usage_data = data.get("usageMetadata", {})
+        usage = TokenUsage(
+            input_tokens=usage_data.get("promptTokenCount", 0),
+            output_tokens=usage_data.get("candidatesTokenCount", 0),
+        )
+
+        return LLMResult(content=content_text, tool_calls=tool_calls, usage=usage)
+
+    async def stream(
+        self,
+        messages: list[LLMMessage],
+        system: str | None = None,
+        model: str | None = None,
+    ) -> AsyncIterator[str]:
+        """Stream reply tokens using Gemini streamGenerateContent SSE endpoint."""
+        import json
+        import httpx
+
+        model_name = "gemini-3.8-flash"
+        url = f"{self._base_url}/{model_name}:streamGenerateContent?alt=sse&key={self._api_key}"
+
+        system_instruction, contents = self._format_messages_for_gemini(messages, system)
+        payload: dict[str, Any] = {"contents": contents}
+        if system_instruction:
+            payload["system_instruction"] = system_instruction
+
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                async with client.stream("POST", url, json=payload) as resp:
+                    if resp.status_code != 200:
+                        body = await resp.aread()
+                        raise LLMError(
+                            f"Gemini streaming error ({resp.status_code}): {body.decode()}"
+                        )
+                    async for line in resp.aiter_lines():
+                        if line.startswith("data:"):
+                            raw_data = line[5:].strip()
+                            if not raw_data:
+                                continue
+                            try:
+                                chunk = json.loads(raw_data)
+                                parts = (
+                                    chunk.get("candidates", [{}])[0]
+                                    .get("content", {})
+                                    .get("parts", [])
+                                )
+                                for part in parts:
+                                    token = part.get("text", "")
+                                    if token:
+                                        yield token
+                            except json.JSONDecodeError:
+                                pass
+        except httpx.TimeoutException as e:
+            raise LLMTimeoutError(f"Gemini streaming timed out: {e}") from e
+        except Exception as e:
+            if isinstance(e, (LLMError, LLMTimeoutError)):
+                raise
+            raise LLMError(f"Gemini streaming failed: {e}") from e

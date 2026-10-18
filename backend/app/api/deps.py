@@ -213,13 +213,23 @@ def rate_limit(
 
 
 def get_llm_client(settings: Settings = Depends(get_settings)) -> LLMClient:
-    """Return LLM client instance (AnthropicClient or FakeLLMClient depending on env)."""
-    if settings.environment == "test" or not settings.anthropic_api_key:
+    """Return LLM client instance (AnthropicClient, GeminiClient, or FakeLLMClient depending on env)."""
+    if settings.environment == "test":
         return FakeLLMClient()
-    return AnthropicClient(
-        api_key=settings.anthropic_api_key,
-        default_model=settings.strong_model,
-    )
+    if settings.anthropic_api_key:
+        return AnthropicClient(
+            api_key=settings.anthropic_api_key,
+            default_model=settings.strong_model,
+        )
+    if settings.gemini_api_key:
+        from app.services.llm import GeminiClient
+
+        return GeminiClient(
+            api_key=settings.gemini_api_key,
+            fast_model="gemini-3.8-flash",
+            strong_model="gemini-3.8-flash",
+        )
+    return FakeLLMClient()
 
 
 async def get_diagnoser_service(

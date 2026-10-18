@@ -289,44 +289,188 @@ export async function createSession(conceptId: string): Promise<string> {
 }
 
 /**
- * Send a turn message and receive Socratic reply with cognitive diagnosis
+ * Fetch a session and its recorded turns
+ */
+export async function getSession(
+  sessionId: string
+): Promise<{ id: string; turns: TurnMessage[] } | null> {
+  try {
+    const res = await fetchWithAuth(`/sessions/${sessionId}`);
+    if (res.ok) {
+      const data = await res.json();
+      const turns: TurnMessage[] = (data.turns || []).map((t: any) => ({
+        id: t.id,
+        role: t.role === "assistant" ? "tutor" : "learner",
+        content: t.content,
+        createdAt: new Date(t.created_at).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        strategy: t.strategy || "guided_hint",
+        diagnosis: t.diagnosis
+          ? {
+              isCorrect: t.diagnosis.understanding === "correct",
+              confidence: t.diagnosis.confidence || 0.9,
+              misconceptionId: t.diagnosis.misconception_id,
+              reasoning: t.diagnosis.misconception_id
+                ? `Misconception detected: ${t.diagnosis.misconception_id}`
+                : "Demonstrated sound conceptual reasoning",
+              verifiedMath: true,
+            }
+          : undefined,
+      }));
+      return { id: data.id, turns };
+    }
+  } catch (err) {
+    console.warn("Failed to retrieve session from backend:", err);
+  }
+  return null;
+}
+
+export interface StreamTurnCallbacks {
+  onToken?: (token: string) => void;
+  onStrategy?: (strategy: string) => void;
+  onMastery?: (update: {
+    concept_id: string;
+    old: number;
+    new: number;
+    attempts: number;
+    state: string;
+  }) => void;
+  onDone?: (data: { turn_id: string; session_id: string; strategy: string }) => void;
+  onError?: (err: any) => void;
+}
+
+/**
+ * Send learner message and stream live Socratic SSE responses
+ */
+export async function streamTurnMessage(
+  sessionId: string,
+  userMessage: string,
+  callbacks: StreamTurnCallbacks
+): Promise<void> {
+  const res = await fetchWithAuth(`/sessions/${sessionId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ content: userMessage }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Session message stream failed with status ${res.status}`);
+  }
+
+  if (!res.body) {
+    throw new Error("No response body readable from server stream");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const rawJson = trimmed.slice(5).trim();
+      if (!rawJson) continue;
+
+      try {
+        const event = JSON.parse(rawJson);
+        if (event.type === "token" && callbacks.onToken) {
+          callbacks.onToken(event.data);
+        } else if (event.type === "strategy" && callbacks.onStrategy) {
+          callbacks.onStrategy(event.data.strategy);
+        } else if (event.type === "mastery_update" && callbacks.onMastery) {
+          callbacks.onMastery(event.data);
+        } else if (event.type === "done" && callbacks.onDone) {
+          callbacks.onDone(event.data);
+        } else if (event.type === "error" && callbacks.onError) {
+          callbacks.onError(event.data);
+        }
+      } catch (err) {
+        console.warn("Failed to parse SSE event chunk:", rawJson, err);
+      }
+    }
+  }
+}
+
+/**
+ * Fallback pedagogical responder for offline or resilient local dev
  */
 export async function sendTurnMessage(
   sessionId: string,
   conceptId: string,
   userMessage: string
 ): Promise<TurnMessage> {
-  // In development, attempt real backend SSE or fallback to intelligent client responder
   const concept = CURRICULUM_CONCEPTS.find((c) => c.id === conceptId) || CURRICULUM_CONCEPTS[4];
-
-  // Detect if user response triggers a known misconception
   const lower = userMessage.toLowerCase();
   let detectedMisc = undefined;
   let strategy: any = "guided_hint";
   let isCorrect = true;
   let tutorReply = "";
 
-  if (lower.includes("need a force to keep moving") || lower.includes("stops without an engine") || lower.includes("slow down naturally in space")) {
+  if (
+    lower.includes("need a force to keep moving") ||
+    lower.includes("stops without an engine") ||
+    lower.includes("slow down naturally in space") ||
+    lower.includes("force keeps it moving")
+  ) {
     detectedMisc = CURRICULUM_MISCONCEPTIONS.find((m) => m.id === "misc_motion_requires_force");
     strategy = "cognitive_conflict";
     isCorrect = false;
     tutorReply =
       "That is a very common intuitive hunch! But consider Voyager 1, which has had its engines shut off for over 40 years. Why hasn't it slowed down or stopped as it travels through deep space?";
-  } else if (lower.includes("acceleration is zero") && lower.includes("at the top")) {
+  } else if (
+    (lower.includes("acceleration is zero") || lower.includes("no acceleration")) &&
+    lower.includes("at the top")
+  ) {
     detectedMisc = CURRICULUM_MISCONCEPTIONS.find((m) => m.id === "misc_acceleration_same_as_velocity");
     strategy = "cognitive_conflict";
     isCorrect = false;
     tutorReply =
       "You noticed that at the peak of flight, the ball momentarily pauses (velocity = 0). But did gravity suddenly stop pulling on the ball at that exact instant?";
-  } else if (lower.includes("because") || lower.includes("f = ma") || lower.includes("inertia") || lower.includes("friction")) {
+  } else if (
+    lower.includes("heavier falls faster") ||
+    lower.includes("heavy things drop faster") ||
+    lower.includes("mass falls quicker")
+  ) {
+    detectedMisc = CURRICULUM_MISCONCEPTIONS.find((m) => m.id === "misc_heavy_objects_fall_faster");
+    strategy = "cognitive_conflict";
+    isCorrect = false;
+    tutorReply =
+      "Aristotle thought heavier objects fall faster too! But remember Apollo 15 on the Moon: when an astronaut dropped a heavy hammer and a light falcon feather in vacuum, they hit the dust at the exact same instant. Why would that happen?";
+  } else if (
+    lower.includes("moon doesn't pull back") ||
+    lower.includes("earth pulls more") ||
+    lower.includes("greater force because bigger")
+  ) {
+    detectedMisc = CURRICULUM_MISCONCEPTIONS.find((m) => m.id === "misc_larger_mass_exerts_larger_force");
+    strategy = "cognitive_conflict";
+    isCorrect = false;
+    tutorReply =
+      "Think about Newton's Third Law: forces always occur in equal and opposite pairs. If Earth pulls on the Moon, does the Moon exert an equal force on Earth?";
+  } else if (
+    lower.includes("friction") ||
+    lower.includes("inertia") ||
+    lower.includes("f = ma") ||
+    lower.includes("equal and opposite") ||
+    lower.includes("constant velocity")
+  ) {
     isCorrect = true;
     strategy = "socratic_challenge";
     tutorReply =
-      "Spot on! You accurately identified that it is an external unbalanced force (like friction or drag) that alters motion. How would this behavior change if the surface was frictionless ice vs rough concrete?";
+      `Spot on! You correctly identified the core principle of ${concept.title}. Now, how would this behavior change if we doubled the mass of the object or made the contact surface completely frictionless?`;
   } else {
     isCorrect = true;
     strategy = "guided_hint";
-    tutorReply = `Good line of thought. When thinking about ${concept.title}, what are the external forces acting directly upon the object? Try drawing a mental free-body diagram.`;
+    tutorReply =
+      `Good question to examine. When analyzing **${concept.title}**, what are the external forces acting directly upon the system? Try drawing a mental free-body diagram.`;
   }
 
   return {
@@ -341,7 +485,7 @@ export async function sendTurnMessage(
       misconceptionId: detectedMisc ? detectedMisc.id : undefined,
       reasoning: detectedMisc
         ? `Learner exhibited classic ${detectedMisc.statement}`
-        : "Learner demonstrated sound conceptual reasoning.",
+        : `Learner demonstrated sound reasoning about ${concept.title}.`,
       verifiedMath: true,
     },
   };
