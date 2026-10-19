@@ -277,6 +277,38 @@ export function signIn(token: string, user: AuthUser): void {
 }
 
 /**
+ * Directly set authenticated state (e.g. from verified Clerk session or offline fallback).
+ */
+export function setAuthenticatedUser(user: AuthUser, token?: string): void {
+  const cached = getStoredProfile();
+  if (cached && cached.id && cached.id !== user.id) {
+    clearAllUserState();
+  }
+
+  if (token) {
+    const formattedToken = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
+    setStoredToken(formattedToken);
+    try {
+      if (typeof document !== "undefined") {
+        document.cookie = `thinkloop_auth_token=${encodeURIComponent(formattedToken)}; path=/; SameSite=Lax`;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  setStoredProfile(user);
+
+  state = {
+    status: "authenticated",
+    user,
+    error: null,
+    epoch: currentEpoch,
+  };
+  notify();
+}
+
+/**
  * Bootstrap session on workspace mount.
  */
 export async function bootstrapSession(explicitToken?: string): Promise<AuthState> {

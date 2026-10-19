@@ -40,6 +40,7 @@ import {
   AuthStatus,
   setTokenProvider,
   isClerkConfigured,
+  setAuthenticatedUser,
 } from "../../lib/auth";
 import { WorkspaceHeader } from "./components/WorkspaceHeader";
 import { SocraticChatView } from "./components/SocraticChatView";
@@ -186,6 +187,36 @@ export default function WorkspacePage() {
         fetchStreak().then(setStreak);
         fetchCalendar().then(setCalendarDays);
         fetchConceptMastery().then(setMasteryList);
+      } else {
+        // Backend returned 404 or is cold-starting. Since Clerk verified identity, do not block the user!
+        const email = clerkUser?.primaryEmailAddress?.emailAddress || "learner@thinkloop.ai";
+        const name = clerkUser?.fullName || clerkUser?.firstName || clerkUser?.username || "Learner";
+        const fallbackProfile: UserProfile = {
+          id: clerkUser?.id || "clerk_user",
+          authId: clerkUser?.id || "clerk_user",
+          name,
+          email,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+          dailyGoalMinutes: 30,
+          voiceEnabled: true,
+        };
+        setUser(fallbackProfile);
+        setStoredUser(fallbackProfile);
+        setAuthenticatedUser(
+          {
+            id: fallbackProfile.id,
+            name: fallbackProfile.name,
+            email: fallbackProfile.email,
+            timezone: fallbackProfile.timezone,
+            dailyGoalMinutes: fallbackProfile.dailyGoalMinutes,
+            voiceEnabled: fallbackProfile.voiceEnabled,
+          },
+          token
+        );
+
+        fetchStreak().then(setStreak);
+        fetchCalendar().then(setCalendarDays);
+        fetchConceptMastery().then(setMasteryList);
       }
     } else {
       const res = await bootstrapSession();
@@ -246,9 +277,46 @@ export default function WorkspacePage() {
           <p style={{ color: "var(--ink-secondary)", fontSize: "14px", marginBottom: "20px" }}>
             {authError || "Unable to reach server. Please check your connection."}
           </p>
-          <button className="button-primary" onClick={() => initSession()}>
-            Retry Connection
-          </button>
+          <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
+            <button className="button-primary" onClick={() => initSession()}>
+              Retry Connection
+            </button>
+            <button
+              className="button-secondary"
+              style={{
+                padding: "8px 16px",
+                borderRadius: "8px",
+                border: "1px solid var(--line)",
+                background: "var(--surface)",
+                cursor: "pointer",
+                color: "var(--ink)",
+              }}
+              onClick={() => {
+                if (clerkUser) {
+                  const fallbackProfile: UserProfile = {
+                    id: clerkUser.id,
+                    authId: clerkUser.id,
+                    name: clerkUser.fullName || clerkUser.firstName || "Learner",
+                    email: clerkUser.primaryEmailAddress?.emailAddress || "learner@thinkloop.ai",
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+                    dailyGoalMinutes: 30,
+                    voiceEnabled: true,
+                  };
+                  setUser(fallbackProfile);
+                  setStoredUser(fallbackProfile);
+                  setAuthenticatedUser({
+                    id: fallbackProfile.id,
+                    name: fallbackProfile.name,
+                    email: fallbackProfile.email,
+                  });
+                } else {
+                  setAuthStatus("authenticated");
+                }
+              }}
+            >
+              Continue to Workspace
+            </button>
+          </div>
         </div>
       </div>
     );
