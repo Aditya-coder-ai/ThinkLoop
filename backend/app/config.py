@@ -41,6 +41,10 @@ class Settings(BaseSettings):
             "Empty string disables audience verification (required for Clerk)."
         ),
     )
+    auth_sign_up_url: str = Field(
+        default="https://think-loop-mu.vercel.app/sign-up",
+        description="Public frontend sign-up authentication URL",
+    )
 
     # Optional configuration overrides
     environment: Literal["development", "staging", "production", "test"] = "development"

@@ -99,6 +99,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_origins=[
             "http://localhost:3000",
             "http://127.0.0.1:3000",
+            "https://think-loop-mu.vercel.app",
         ],
         allow_credentials=True,
         allow_methods=["*"],
