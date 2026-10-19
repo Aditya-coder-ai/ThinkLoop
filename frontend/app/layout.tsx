@@ -3,7 +3,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import { SmoothCursor } from "@/components/ui/smooth-cursor";
 
-import { isClerkConfigured } from "@/lib/auth/clerkConfig";
+import { getClerkPublishableKey, isClerkConfigured } from "@/lib/auth/clerkConfig";
 
 export const metadata: Metadata = {
   title: "Thinkloop — Learn the way your mind works",
@@ -11,12 +11,10 @@ export const metadata: Metadata = {
     "An AI-powered cognitive mentor that helps students build durable understanding through better questions.",
 };
 
-const clerkReady = isClerkConfigured();
-const publishableKey = clerkReady
-  ? process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!
-  : "pk_test_Y2xlcmsuZXhhbXBsZS5jb20k";
-
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const publishableKey = getClerkPublishableKey();
+  const clerkReady = isClerkConfigured();
+
   return (
     <ClerkProvider
       publishableKey={publishableKey}

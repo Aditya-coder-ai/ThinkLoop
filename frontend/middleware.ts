@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest, NextFetchEvent, NextMiddleware } from "next/server";
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { DEFAULT_CLERK_PUBLISHABLE_KEY } from "@/lib/auth/clerkConfig";
 
 const isProtectedRoute = createRouteMatcher(["/workspace(.*)"]);
 
@@ -13,7 +14,7 @@ const isProtectedRoute = createRouteMatcher(["/workspace(.*)"]);
  * Vercel Edge 500 MIDDLEWARE_INVOCATION_FAILED errors.
  */
 function hasValidClerkKeys(): boolean {
-  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || DEFAULT_CLERK_PUBLISHABLE_KEY;
   const secretKey = process.env.CLERK_SECRET_KEY;
 
   if (!publishableKey || !secretKey) {
@@ -58,15 +59,24 @@ let cachedClerkHandler: NextMiddleware | null = null;
 
 function getClerkHandler(): NextMiddleware {
   if (!cachedClerkHandler) {
-    cachedClerkHandler = clerkMiddleware(async (auth, req) => {
-      if (isProtectedRoute(req)) {
-        const devToken = req.cookies.get("thinkloop_auth_token")?.value;
-        const authObj = auth();
-        if (!authObj.userId && !devToken) {
-          return authObj.redirectToSignIn({ returnBackUrl: req.url });
+    const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || DEFAULT_CLERK_PUBLISHABLE_KEY;
+    const secretKey = process.env.CLERK_SECRET_KEY;
+
+    cachedClerkHandler = clerkMiddleware(
+      async (auth, req) => {
+        if (isProtectedRoute(req)) {
+          const devToken = req.cookies.get("thinkloop_auth_token")?.value;
+          const authObj = auth();
+          if (!authObj.userId && !devToken) {
+            return authObj.redirectToSignIn({ returnBackUrl: req.url });
+          }
         }
+      },
+      {
+        publishableKey,
+        secretKey,
       }
-    }) as unknown as NextMiddleware;
+    ) as unknown as NextMiddleware;
   }
   return cachedClerkHandler;
 }
