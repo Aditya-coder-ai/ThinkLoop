@@ -17,6 +17,7 @@ import {
   Sun,
   X,
   User,
+  LogIn,
 } from "lucide-react";
 import { ScrollProgressStroke } from "./components/ScrollProgressStroke";
 import { signIn } from "../lib/auth";
@@ -337,13 +338,22 @@ export default function Home() {
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "20px" }}>
-              <button
+              <a
+                href="/sign-in"
                 className="button-primary"
-                style={{ width: "100%", justifyContent: "center" }}
+                style={{ width: "100%", justifyContent: "center", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "8px" }}
+              >
+                <LogIn size={16} />
+                <span>Sign In with Clerk</span>
+              </a>
+
+              <button
+                className="button-outline-sm"
+                style={{ width: "100%", justifyContent: "center", padding: "10px" }}
                 onClick={() => handleSignIn("Aditya")}
               >
                 <User size={16} />
-                <span>Continue as Aditya (Demo Learner)</span>
+                <span>Continue as Aditya (Local Demo)</span>
               </button>
 
               <button

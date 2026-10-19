@@ -35,7 +35,7 @@ NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/workspace
 NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/workspace
 "@
 
-$frontendEnvPath = "d:\Thinkloop\ThinkLoop\frontend\.env.local"
+$frontendEnvPath = Join-Path $PSScriptRoot "frontend\.env.local"
 Set-Content -Path $frontendEnvPath -Value $frontendEnv -Encoding UTF8
 Write-Host "[OK] Created frontend/.env.local" -ForegroundColor Green
 
@@ -45,19 +45,22 @@ $clerkIssuer   = "https://$ClerkDomain"
 # Clerk does not require audience claim by default; empty string disables aud check
 $clerkAudience = ""
 
-$backendEnvPath = "d:\Thinkloop\ThinkLoop\.env"
-$backendEnv = Get-Content $backendEnvPath -Raw
-
-$backendEnv = $backendEnv -replace "AUTH_JWKS_URL=.*", "AUTH_JWKS_URL=$clerkJwksUrl"
-$backendEnv = $backendEnv -replace "AUTH_ISSUER=.*",   "AUTH_ISSUER=$clerkIssuer"
-$backendEnv = $backendEnv -replace "AUTH_AUDIENCE=.*", "AUTH_AUDIENCE=$clerkAudience"
-
-Set-Content -Path $backendEnvPath -Value $backendEnv -Encoding UTF8
-Write-Host "[OK] Updated .env with Clerk JWKS URL: $clerkJwksUrl" -ForegroundColor Green
+$backendEnvPath = Join-Path $PSScriptRoot "backend\.env"
+if (Test-Path $backendEnvPath) {
+    $backendEnv = Get-Content $backendEnvPath -Raw
+    $backendEnv = $backendEnv -replace "AUTH_JWKS_URL=.*", "AUTH_JWKS_URL=$clerkJwksUrl"
+    $backendEnv = $backendEnv -replace "AUTH_ISSUER=.*",   "AUTH_ISSUER=$clerkIssuer"
+    $backendEnv = $backendEnv -replace "AUTH_AUDIENCE=.*", "AUTH_AUDIENCE=$clerkAudience"
+    Set-Content -Path $backendEnvPath -Value $backendEnv -Encoding UTF8
+    Write-Host "[OK] Updated backend/.env with Clerk JWKS URL: $clerkJwksUrl" -ForegroundColor Green
+} else {
+    Write-Host "[WARN] backend/.env not found at $backendEnvPath" -ForegroundColor Yellow
+}
 
 Write-Host ""
 Write-Host "=== Setup Complete! ===" -ForegroundColor Green
 Write-Host ""
-Write-Host "Start dev servers:"
-Write-Host "  Terminal 1 (backend) : cd d:\Thinkloop\ThinkLoop\backend && uvicorn app.main:app --reload"
-Write-Host "  Terminal 2 (frontend): cd d:\Thinkloop\ThinkLoop\frontend && npm run dev"
+Write-Host "Restart your dev servers to apply keys:"
+Write-Host "  Terminal 1 (backend) : cd backend && uv run uvicorn app.main:create_app --factory --port 8000"
+Write-Host "  Terminal 2 (frontend): cd frontend && npm run dev"
+
