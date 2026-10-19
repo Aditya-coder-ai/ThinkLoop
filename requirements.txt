@@ -2,6 +2,8 @@
 #    uv export --no-dev --no-hashes -o requirements.txt
 alembic==1.20.0
     # via thinkloop-backend
+gunicorn==23.0.0
+    # via thinkloop-backend
 annotated-doc==0.0.5
     # via
     #   fastapi
