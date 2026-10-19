@@ -186,7 +186,7 @@ export default function Home() {
               <a href="/sign-in" className="nav-btn-ghost">
                 Sign In
               </a>
-              <a href="https://think-loop-mu.vercel.app/sign-up" className="nav-btn-primary">
+              <a href="/sign-up" className="nav-btn-primary">
                 <span>Get Started</span>
                 <ArrowUpRight size={14} strokeWidth={2.2} />
               </a>

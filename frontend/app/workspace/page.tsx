@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   MessageSquare,
   Layers,
@@ -22,7 +22,7 @@ import {
   ConceptItem,
 } from "./types";
 import { CURRICULUM_CONCEPTS } from "./curriculum";
-import { useUser, useClerk } from "@clerk/nextjs";
+import { useUser, useClerk, useAuth } from "@clerk/nextjs";
 import {
   getStoredUser,
   setStoredUser,
@@ -38,6 +38,8 @@ import {
   bootstrapSession,
   signOut as coreSignOut,
   AuthStatus,
+  setTokenProvider,
+  isClerkConfigured,
 } from "../../lib/auth";
 import { WorkspaceHeader } from "./components/WorkspaceHeader";
 import { SocraticChatView } from "./components/SocraticChatView";
@@ -50,7 +52,8 @@ import { PreferencesModal } from "./components/PreferencesModal";
 
 export default function WorkspacePage() {
   const { isLoaded, isSignedIn, user: clerkUser } = useUser();
-  const { signOut: clerkSignOut, session } = useClerk();
+  const { signOut: clerkSignOut } = useClerk();
+  const { getToken } = useAuth();
 
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("tutor");
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -58,36 +61,20 @@ export default function WorkspacePage() {
   const [showPreferences, setShowPreferences] = useState(false);
 
   useEffect(() => {
-    if (isLoaded && clerkUser) {
-      const email = clerkUser.primaryEmailAddress?.emailAddress || "";
-      const name =
-        clerkUser.fullName ||
-        clerkUser.firstName ||
-        clerkUser.username ||
-        "Learner";
-      setUser((prev) => {
-        const profile: UserProfile = {
-          id: clerkUser.id,
-          authId: clerkUser.id,
-          name,
-          email,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-          dailyGoalMinutes: prev.dailyGoalMinutes || 30,
-          voiceEnabled: prev.voiceEnabled ?? true,
-        };
-        setStoredUser(profile);
-        return profile;
+    if (isClerkConfigured()) {
+      setTokenProvider(async () => {
+        try {
+          const t = await getToken();
+          return t ? `Bearer ${t}` : null;
+        } catch {
+          return null;
+        }
       });
-
-      if (session) {
-        session.getToken().then((token) => {
-          if (token) {
-            setStoredToken(`Bearer ${token}`);
-          }
-        });
-      }
     }
-  }, [isLoaded, clerkUser, session]);
+    return () => {
+      setTokenProvider(null);
+    };
+  }, [getToken]);
 
   // Core state
   const [activeConcept, setActiveConcept] = useState<ConceptItem>(CURRICULUM_CONCEPTS[4]); // Newton's 1st Law
@@ -154,29 +141,67 @@ export default function WorkspacePage() {
       }
     });
 
-    bootstrapSession().then((res) => {
-      setAuthStatus(res.status);
-      setAuthError(res.error);
-      if (res.status === "authenticated" && res.user) {
-        setUser({
-          id: res.user.id,
-          authId: res.user.authId || "dev_learner",
-          name: res.user.name,
-          email: res.user.email || "aditya@thinkloop.ai",
-          timezone: res.user.timezone || "UTC",
-          dailyGoalMinutes: res.user.dailyGoalMinutes || 30,
-          voiceEnabled: res.user.voiceEnabled ?? true,
-        });
-        fetchStreak().then(setStreak);
-        fetchCalendar().then(setCalendarDays);
-        fetchConceptMastery().then(setMasteryList);
-      }
-    });
-
     return () => {
       unsub();
     };
   }, []);
+
+  const initSession = useCallback(async () => {
+    if (isClerkConfigured()) {
+      if (!isLoaded) return;
+
+      if (!isSignedIn) {
+        window.location.href = `/sign-in?redirect_url=${encodeURIComponent(window.location.pathname)}`;
+        return;
+      }
+
+      let token: string | undefined;
+      try {
+        const rawToken = await getToken();
+        if (rawToken) {
+          token = `Bearer ${rawToken}`;
+          setStoredToken(token);
+        }
+      } catch {
+        // ignore
+      }
+
+      const res = await bootstrapSession(token);
+
+      if (res.status === "authenticated" && res.user) {
+        const email = clerkUser?.primaryEmailAddress?.emailAddress || res.user.email || "";
+        const name = clerkUser?.fullName || clerkUser?.firstName || clerkUser?.username || res.user.name;
+        const profile: UserProfile = {
+          id: res.user.id,
+          authId: res.user.authId || clerkUser?.id || "dev_learner",
+          name,
+          email,
+          timezone: res.user.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+          dailyGoalMinutes: res.user.dailyGoalMinutes || 30,
+          voiceEnabled: res.user.voiceEnabled ?? true,
+        };
+        setUser(profile);
+        setStoredUser(profile);
+
+        fetchStreak().then(setStreak);
+        fetchCalendar().then(setCalendarDays);
+        fetchConceptMastery().then(setMasteryList);
+      }
+    } else {
+      const res = await bootstrapSession();
+
+      if (res.status === "authenticated" && res.user) {
+        fetchStreak().then(setStreak);
+        fetchCalendar().then(setCalendarDays);
+        fetchConceptMastery().then(setMasteryList);
+      }
+    }
+  }, [isLoaded, isSignedIn, clerkUser, getToken]);
+
+  // Bootstrap session when auth credentials are ready
+  useEffect(() => {
+    initSession();
+  }, [initSession]);
 
   const toggleTheme = () => {
     const nextTheme = theme === "light" ? "dark" : "light";
@@ -221,7 +246,7 @@ export default function WorkspacePage() {
           <p style={{ color: "var(--ink-secondary)", fontSize: "14px", marginBottom: "20px" }}>
             {authError || "Unable to reach server. Please check your connection."}
           </p>
-          <button className="button-primary" onClick={() => bootstrapSession()}>
+          <button className="button-primary" onClick={() => initSession()}>
             Retry Connection
           </button>
         </div>

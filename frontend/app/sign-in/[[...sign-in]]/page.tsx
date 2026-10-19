@@ -18,7 +18,7 @@ export default function SignInPage() {
       }}
     >
       {clerkReady ? (
-        <SignIn path="/sign-in" routing="path" signUpUrl="https://think-loop-mu.vercel.app/sign-up" fallbackRedirectUrl="/workspace" />
+        <SignIn path="/sign-in" routing="path" signUpUrl="/sign-up" fallbackRedirectUrl="/workspace" />
       ) : (
         <AuthFallbackCard mode="sign-in" />
       )}

@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest, NextFetchEvent, NextMiddleware } from "next/server";
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 import { DEFAULT_CLERK_PUBLISHABLE_KEY } from "@/lib/auth/clerkConfig";
-
-const isProtectedRoute = createRouteMatcher(["/workspace(.*)"]);
 
 /**
  * Validates that BOTH required Clerk keys are present, non-empty,
@@ -40,17 +38,7 @@ function hasValidClerkKeys(): boolean {
  * Standard authentication middleware for local dev or when Clerk is unconfigured.
  * Checks for local auth tokens without invoking external Clerk SDK endpoints.
  */
-function fallbackMiddleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  if (pathname.startsWith("/workspace")) {
-    const authToken = request.cookies.get("thinkloop_auth_token")?.value;
-    if (!authToken) {
-      const loginUrl = request.nextUrl.clone();
-      loginUrl.pathname = "/";
-      loginUrl.searchParams.set("reason", "unauthenticated");
-      return NextResponse.redirect(loginUrl);
-    }
-  }
+function fallbackMiddleware(_request: NextRequest) {
   return NextResponse.next();
 }
 
@@ -63,14 +51,9 @@ function getClerkHandler(): NextMiddleware {
     const secretKey = process.env.CLERK_SECRET_KEY;
 
     cachedClerkHandler = clerkMiddleware(
-      async (auth, req) => {
-        if (isProtectedRoute(req)) {
-          const devToken = req.cookies.get("thinkloop_auth_token")?.value;
-          const authObj = auth();
-          if (!authObj.userId && !devToken) {
-            return authObj.redirectToSignIn({ returnBackUrl: req.url });
-          }
-        }
+      async (_auth, _req) => {
+        // Clerk decorates the request with auth state headers and handles OAuth handshakes automatically.
+        // Authoritative user session verification & gating is performed by authStore in /workspace.
       },
       {
         publishableKey,
@@ -85,7 +68,7 @@ function getClerkHandler(): NextMiddleware {
  * Resilient Next.js Middleware with graceful error boundary.
  *
  * Guarantees that any internal Clerk initialization or network failure
- * on Vercel Edge Runtime fails open to standard cookie auth rather than
+ * on Vercel Edge Runtime fails open to standard client auth rather than
  * crashing with 500 MIDDLEWARE_INVOCATION_FAILED.
  */
 export default async function middleware(request: NextRequest, event: NextFetchEvent) {
@@ -94,7 +77,7 @@ export default async function middleware(request: NextRequest, event: NextFetchE
       const handler = getClerkHandler();
       return await handler(request, event);
     } catch (error) {
-      console.error("[Middleware] Clerk invocation failed on Vercel, falling back to local auth:", error);
+      console.error("[Middleware] Clerk invocation failed, falling back to client auth:", error);
       return fallbackMiddleware(request);
     }
   }

@@ -12,9 +12,21 @@ import {
   getUserScopedKeys,
 } from "./storageRegistry";
 import { broadcastAuthEvent, onAuthBroadcast } from "./broadcast";
+import { isClerkConfigured } from "./clerkConfig";
 
 const AUTH_STORAGE_KEY = "thinkloop_auth_token";
 const USER_STORAGE_KEY = "thinkloop_user_profile";
+
+export type TokenProvider = () => Promise<string | null> | string | null;
+let currentTokenProvider: TokenProvider | null = null;
+
+export function setTokenProvider(provider: TokenProvider | null): void {
+  currentTokenProvider = provider;
+}
+
+export function getTokenProvider(): TokenProvider | null {
+  return currentTokenProvider;
+}
 
 let currentEpoch = 1;
 let epochAbortController = new AbortController();
@@ -100,6 +112,10 @@ function scheduleProactiveExpiry(token: string | null | undefined): void {
 
   if (!token) return;
 
+  // When Clerk is active or a dynamic tokenProvider is configured, token refreshing is handled automatically.
+  // Proactively terminating the session based on short-lived Clerk JWT exp (60s) would kick users out prematurely.
+  if (isClerkConfigured() || currentTokenProvider) return;
+
   // Parse payload if JWT
   const parts = token.replace(/^Bearer\s+/i, "").split(".");
   if (parts.length === 3) {
@@ -109,10 +125,12 @@ function scheduleProactiveExpiry(token: string | null | undefined): void {
       if (payload.exp && typeof payload.exp === "number") {
         const nowMs = Date.now();
         const expMs = payload.exp * 1000;
-        const delay = Math.max(0, expMs - nowMs - 5000); // 5 seconds before actual exp
-        proactiveExpiryTimeout = setTimeout(() => {
-          handle401("expired");
-        }, delay);
+        const delay = expMs - nowMs - 5000; // 5 seconds before actual exp
+        if (delay > 0) {
+          proactiveExpiryTimeout = setTimeout(() => {
+            handle401("expired");
+          }, delay);
+        }
       }
     } catch {
       // Not a standard JWT or unparseable
@@ -261,7 +279,7 @@ export function signIn(token: string, user: AuthUser): void {
 /**
  * Bootstrap session on workspace mount.
  */
-export async function bootstrapSession(): Promise<AuthState> {
+export async function bootstrapSession(explicitToken?: string): Promise<AuthState> {
   const epochAtStart = currentEpoch;
   state = {
     ...state,
@@ -270,7 +288,29 @@ export async function bootstrapSession(): Promise<AuthState> {
   };
   notify();
 
-  const token = getStoredToken();
+  let token: string | null | undefined = explicitToken;
+  if (!token && currentTokenProvider) {
+    try {
+      const dynamic = await currentTokenProvider();
+      if (dynamic) {
+        token = dynamic.startsWith("Bearer ") ? dynamic : `Bearer ${dynamic}`;
+        setStoredToken(token);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!token) {
+    token = getStoredToken();
+  }
+
+  // If in pure local dev mode without Clerk and without token, fallback to dev_learner
+  if (!token && !isClerkConfigured()) {
+    token = "Bearer dev_learner";
+    setStoredToken(token);
+  }
+
   const cachedProfile = getStoredProfile();
 
   const headers: Record<string, string> = {};
@@ -279,7 +319,7 @@ export async function bootstrapSession(): Promise<AuthState> {
   }
 
   try {
-    const res = await fetch("/backend-api/me", {
+    let res = await fetch("/backend-api/me", {
       headers,
       credentials: "include",
       signal: epochAbortController.signal,
@@ -288,6 +328,30 @@ export async function bootstrapSession(): Promise<AuthState> {
     // Check if epoch changed while fetching (e.g. signed out in-flight)
     if (currentEpoch !== epochAtStart) {
       return state;
+    }
+
+    // If 401, try one refresh if dynamic token provider is configured (e.g. Clerk token expired)
+    if (res.status === 401 && (isClerkConfigured() || currentTokenProvider)) {
+      if (currentTokenProvider) {
+        try {
+          const fresh = await currentTokenProvider();
+          if (fresh) {
+            token = fresh.startsWith("Bearer ") ? fresh : `Bearer ${fresh}`;
+            setStoredToken(token);
+            headers["Authorization"] = token;
+            res = await fetch("/backend-api/me", {
+              headers,
+              credentials: "include",
+              signal: epochAbortController.signal,
+            });
+            if (currentEpoch !== epochAtStart) {
+              return state;
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
     }
 
     if (res.status === 401) {

@@ -7,7 +7,8 @@
  * - Respects 429 Retry-After header
  */
 
-import { authStore, getStoredToken, handle401 } from "./authStore";
+import { authStore, getStoredToken, setStoredToken, getTokenProvider, handle401 } from "./authStore";
+import { isClerkConfigured } from "./clerkConfig";
 
 const BACKEND_BASE = "/backend-api";
 
@@ -16,10 +17,27 @@ export async function fetchWithAuth(
   options: RequestInit = {}
 ): Promise<Response> {
   const epochAtStart = authStore.getEpoch();
-  const token = getStoredToken() || "Bearer dev_learner";
+  let token = getStoredToken();
+  const provider = getTokenProvider();
+
+  if (provider) {
+    try {
+      const dynamic = await provider();
+      if (dynamic) {
+        token = dynamic.startsWith("Bearer ") ? dynamic : `Bearer ${dynamic}`;
+        setStoredToken(token);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!token && !isClerkConfigured()) {
+    token = "Bearer dev_learner";
+  }
 
   const headers = new Headers(options.headers || {});
-  if (!headers.has("Authorization")) {
+  if (!headers.has("Authorization") && token) {
     headers.set("Authorization", token);
   }
   if (!headers.has("Content-Type") && options.body && typeof options.body === "string") {
@@ -63,8 +81,28 @@ export async function fetchWithAuth(
     throw new DOMException("Response discarded due to sign-out during flight", "AbortError");
   }
 
-  // Intercept 401 Unauthorized -> single flight sign out
+  // Intercept 401 Unauthorized -> try refresh if dynamic provider available, else single flight sign out
   if (res.status === 401) {
+    if (isClerkConfigured() && provider) {
+      try {
+        const fresh = await provider();
+        if (fresh) {
+          const freshToken = fresh.startsWith("Bearer ") ? fresh : `Bearer ${fresh}`;
+          setStoredToken(freshToken);
+          headers.set("Authorization", freshToken);
+          const retryRes = await fetch(url, {
+            ...options,
+            headers,
+            signal: effectiveSignal,
+          });
+          if (retryRes.status !== 401) {
+            return retryRes;
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
     await handle401("expired");
     return res;
   }
