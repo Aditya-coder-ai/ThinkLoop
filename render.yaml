@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: thinkloop-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:create_app --factory --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: ENVIRONMENT
+        value: production
+      - key: AUTH_DEV_MODE
+        value: false
+      - key: AUTH_JWKS_URL
+        value: https://star-sponge-9930.clerk.accounts.dev/.well-known/jwks.json
+      - key: AUTH_ISSUER
+        value: https://star-sponge-9930.clerk.accounts.dev
+      - key: AUTH_AUDIENCE
+        value: ""
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
