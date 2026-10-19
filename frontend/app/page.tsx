@@ -15,12 +15,8 @@ import {
   Lightbulb,
   Moon,
   Sun,
-  X,
-  User,
-  LogIn,
 } from "lucide-react";
 import { ScrollProgressStroke } from "./components/ScrollProgressStroke";
-import { signIn } from "../lib/auth";
 
 const loopSteps = [
   {
@@ -133,8 +129,6 @@ function Reveal({ children, delay = 0, className = "" }: { children: React.React
 export default function Home() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [activeStep, setActiveStep] = useState(0);
-  const [showSignInModal, setShowSignInModal] = useState(false);
-  const [learnerName, setLearnerName] = useState("Aditya");
   const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
@@ -152,71 +146,71 @@ export default function Home() {
     window.localStorage.setItem("thinkloop-theme", nextTheme);
   };
 
-  const handleSignIn = (name: string) => {
-    const cleanName = (name || "Aditya").trim();
-    const sanitizedHandle = cleanName.toLowerCase().replace(/[^a-z0-9_-]/g, "_").slice(0, 32);
-    const authId = `dev_${sanitizedHandle}`;
-    const userProfile = {
-      id: "u_dev_1",
-      authId,
-      name: cleanName,
-      email: `${sanitizedHandle}@thinkloop.ai`,
-      timezone: "UTC",
-      dailyGoalMinutes: 30,
-      voiceEnabled: true,
-    };
-    signIn(authId, userProfile);
-    window.location.href = "/workspace";
-  };
-
   const step = loopSteps[activeStep];
 
   return (
     <main className="site-main">
       <ScrollProgressStroke />
-      <nav className="site-nav" aria-label="Main navigation">
-        <a className="wordmark" href="#top" aria-label="Thinkloop home">
-          <span className="wordmark-symbol" aria-hidden="true"><span /><span /><span /></span>
-          <span>thinkloop</span>
-        </a>
-        <div className="nav-links">
-          <a href="#method">The method</a>
-          <a href="#features">What it notices</a>
-          <a href="#mvp">MVP</a>
-          <a href="/workspace" className="font-semibold text-clay">Workspace</a>
-        </div>
-        <div className="nav-actions">
-          <button className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}>
-            {theme === "light" ? <Moon size={16} strokeWidth={1.8} /> : <Sun size={16} strokeWidth={1.8} />}
-            <span>{theme === "light" ? "Night" : "Day"}</span>
-          </button>
-          <button
-            className="nav-cta cursor-pointer"
-            onClick={() => setShowSignInModal(true)}
-            style={{ background: "transparent", border: "none", font: "inherit", color: "inherit", cursor: "pointer" }}
-          >
-            Sign In
-          </button>
-          <SignedOut>
-            <a
-              href="/sign-in"
-              className="button button-outline-sm"
-              style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", padding: "8px 14px", fontSize: "13px" }}
+      <header className="site-header">
+        <nav className="site-nav" aria-label="Main navigation">
+          <a className="wordmark" href="#top" aria-label="Thinkloop home">
+            <span className="wordmark-symbol" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+            <span className="wordmark-text">thinkloop</span>
+          </a>
+
+          <div className="nav-links">
+            <a href="#method" className="nav-link">The method</a>
+            <a href="#features" className="nav-link">What it notices</a>
+            <a href="#mvp" className="nav-link">MVP</a>
+            <a href="/workspace" className="nav-link nav-link-workspace">
+              <span>Workspace</span>
+              <span className="workspace-badge-dot" />
+            </a>
+          </div>
+
+          <div className="nav-actions">
+            <button
+              className="theme-toggle"
+              onClick={toggleTheme}
+              aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
             >
-              Clerk Login
-            </a>
-            <a className="button button-primary" href="/sign-up">
-              Get Started <ArrowUpRight size={16} />
-            </a>
-          </SignedOut>
-          <SignedIn>
-            <a className="button button-primary" href="/workspace">
-              Enter Workspace <ArrowUpRight size={16} />
-            </a>
-            <UserButton afterSignOutUrl="/" />
-          </SignedIn>
-        </div>
-      </nav>
+              {theme === "light" ? <Moon size={14} strokeWidth={2} /> : <Sun size={14} strokeWidth={2} />}
+              <span className="theme-toggle-label">{theme === "light" ? "Night" : "Day"}</span>
+            </button>
+
+            <SignedOut>
+              <a href="/sign-in" className="nav-btn-ghost">
+                Sign In
+              </a>
+              <a href="/sign-up" className="nav-btn-primary">
+                <span>Get Started</span>
+                <ArrowUpRight size={14} strokeWidth={2.2} />
+              </a>
+            </SignedOut>
+
+            <SignedIn>
+              <a href="/workspace" className="nav-btn-primary nav-btn-workspace">
+                <span>Open Workspace</span>
+                <ArrowUpRight size={14} strokeWidth={2.2} />
+              </a>
+              <div className="user-button-wrapper">
+                <UserButton
+                  afterSignOutUrl="/"
+                  appearance={{
+                    elements: {
+                      userButtonAvatarBox: "w-8 h-8 rounded-full border border-[var(--line-strong)]",
+                    },
+                  }}
+                />
+              </div>
+            </SignedIn>
+          </div>
+        </nav>
+      </header>
 
       <section className="hero" id="top">
         <div className="hero-copy">
@@ -321,81 +315,18 @@ export default function Home() {
         <div className="closing-card"><div className="closing-ring ring-one" /><div className="closing-ring ring-two" /><div className="closing-mark"><span /><span /><span /></div><p>Keep the question.<br /><strong>Change the way<br />you find the answer.</strong></p><a href="/workspace" className="button button-light">Enter Workspace <ArrowUpRight size={16} /></a></div>
       </section>
 
-      <footer className="site-footer"><a className="wordmark" href="#top"><span className="wordmark-symbol" aria-hidden="true"><span /><span /><span /></span><span>thinkloop</span></a><p>Learning that leaves you with more than an answer.</p><span className="footer-note">A cognitive learning system / 2025</span></footer>
-
-      {showSignInModal && (
-        <div className="modal-backdrop">
-          <div className="modal-card">
-            <div className="modal-header">
-              <h3>Sign in to Thinkloop</h3>
-              <button className="modal-close-btn" onClick={() => setShowSignInModal(false)} aria-label="Close">
-                <X size={18} />
-              </button>
-            </div>
-
-            <p className="setup-sub" style={{ textAlign: "left", marginBottom: "18px" }}>
-              Access your personal cognitive mentor, live streak calendar, concept mastery graph, and doubt ledger.
-            </p>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "20px" }}>
-              <a
-                href="/sign-in"
-                className="button-primary"
-                style={{ width: "100%", justifyContent: "center", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "8px" }}
-              >
-                <LogIn size={16} />
-                <span>Sign In with Clerk</span>
-              </a>
-
-              <button
-                className="button-outline-sm"
-                style={{ width: "100%", justifyContent: "center", padding: "10px" }}
-                onClick={() => handleSignIn("Aditya")}
-              >
-                <User size={16} />
-                <span>Continue as Aditya (Local Demo)</span>
-              </button>
-
-              <button
-                className="button-outline-sm"
-                style={{ width: "100%", justifyContent: "center", padding: "10px" }}
-                onClick={() => handleSignIn("Guest Learner")}
-              >
-                <span>Continue as Guest</span>
-              </button>
-            </div>
-
-            <div style={{ borderTop: "1px solid var(--line)", paddingTop: "16px" }}>
-              <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "6px" }}>
-                Or customize your learner name:
-              </label>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <input
-                  type="text"
-                  placeholder="Enter your name"
-                  value={learnerName}
-                  onChange={(e) => setLearnerName(e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: "10px 14px",
-                    borderRadius: "8px",
-                    border: "1px solid var(--line)",
-                    background: "var(--paper-deep)",
-                    color: "var(--ink)",
-                    fontSize: "13px",
-                  }}
-                />
-                <button
-                  className="button-primary"
-                  onClick={() => handleSignIn(learnerName)}
-                >
-                  Enter
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <footer className="site-footer">
+        <a className="wordmark" href="#top" aria-label="Thinkloop home">
+          <span className="wordmark-symbol" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
+          <span className="wordmark-text">thinkloop</span>
+        </a>
+        <p>Learning that leaves you with more than an answer.</p>
+        <span className="footer-note">A cognitive learning system / 2025</span>
+      </footer>
     </main>
   );
 }
