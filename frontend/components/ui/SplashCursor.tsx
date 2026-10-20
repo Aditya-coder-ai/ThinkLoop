@@ -322,23 +322,26 @@ const hsv = (h: number, s: number, v: number): [number, number, number] => {
   return [v, p, q];
 };
 
+const THINKLOOP_LIGHT_PALETTE = ['#4c5839', '#b96245', '#c2964d', '#6e7754', '#8a9a6e'];
+const THINKLOOP_DARK_PALETTE = ['#9ba879', '#dc896d', '#d6ad69', '#c3ce9a', '#7ebc9a'];
+
 export const SplashCursor: FC<SplashCursorProps> = ({
-  colors = ['#4f8cff', '#2dd4bf', '#ffd166'],
-  rainbow = true,
-  colorSpeed = 1,
-  intensity = 1,
+  colors,
+  rainbow = false,
+  colorSpeed = 0.8,
+  intensity,
   size = 1,
   force = 1,
   swirl = 3,
-  trail = 1,
+  trail = 1.1,
   momentum = 1,
-  shading = 1,
-  glow = 0,
+  shading,
+  glow,
   quality = 'high',
   clickSplash = true,
   intro = true,
   contained = false,
-  theme = 'dark',
+  theme,
   zIndex = 50,
   className = '',
   style
@@ -347,22 +350,66 @@ export const SplashCursor: FC<SplashCursorProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [generation, setGeneration] = useState(0);
 
+  // Automatically track website theme from document.documentElement data-theme attribute
+  const [detectedTheme, setDetectedTheme] = useState<'dark' | 'light'>('light');
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const readTheme = (): 'dark' | 'light' => {
+      const dataTheme = document.documentElement.dataset.theme;
+      if (dataTheme === 'dark' || dataTheme === 'light') return dataTheme;
+      if (document.documentElement.classList.contains('dark')) return 'dark';
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    };
+
+    setDetectedTheme(readTheme());
+
+    const observer = new MutationObserver(() => {
+      setDetectedTheme(readTheme());
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme', 'class'],
+    });
+
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleMedia = () => setDetectedTheme(readTheme());
+    mql.addEventListener('change', handleMedia);
+
+    return () => {
+      observer.disconnect();
+      mql.removeEventListener('change', handleMedia);
+    };
+  }, []);
+
+  const activeTheme = theme || detectedTheme;
+  const isLight = activeTheme === 'light';
+
+  const defaultPalette = isLight ? THINKLOOP_LIGHT_PALETTE : THINKLOOP_DARK_PALETTE;
+  const activeColors = colors && colors.length ? colors : defaultPalette;
+
+  const defaultIntensity = isLight ? 0.6 : 0.72;
+  const defaultShading = isLight ? 0.32 : 0.42;
+  const defaultGlow = isLight ? 0 : 0.38;
+
   const settings = {
-    palette: (Array.isArray(colors) && colors.length ? colors : ['#ffffff']).map(parseColor),
+    palette: activeColors.map(parseColor),
     rainbow,
     colorSpeed: Math.max(0, colorSpeed),
-    intensity: Math.max(0, intensity),
+    intensity: Math.max(0, intensity ?? defaultIntensity),
     size: Math.max(0.05, size),
     force: Math.max(0, force),
     swirl: Math.max(0, swirl),
     trail: Math.max(0.05, trail),
     momentum: Math.max(0.05, momentum),
-    shading: clamp(shading, 0, 1),
-    glow: clamp(glow, 0, 1),
+    shading: clamp(shading ?? defaultShading, 0, 1),
+    glow: clamp(glow ?? defaultGlow, 0, 1),
     quality: QUALITY[quality] ? quality : 'high',
     clickSplash,
     contained,
-    light: theme === 'light'
+    light: isLight
   };
   const settingsRef = useRef(settings);
   settingsRef.current = settings;

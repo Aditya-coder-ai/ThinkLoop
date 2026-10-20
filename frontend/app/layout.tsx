@@ -24,14 +24,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <html lang="en" data-theme="light" suppressHydrationWarning>
         <body>
           <SplashCursor
-            rainbow
             size={1}
             force={1}
             swirl={3}
-            trail={1}
+            trail={1.1}
             clickSplash
-            intensity={0.7}
-            shading={0.23}
+            colorSpeed={0.8}
           />
           <SmoothCursor />
           {children}
