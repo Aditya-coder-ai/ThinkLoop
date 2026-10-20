@@ -3,6 +3,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import { SmoothCursor } from "@/components/ui/smooth-cursor";
 import SplashCursor from "@/components/ui/SplashCursor";
+import ClickSpark from "@/components/ui/ClickSpark";
 
 import { getClerkPublishableKey, isClerkConfigured } from "@/lib/auth/clerkConfig";
 
@@ -31,8 +32,16 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             clickSplash
             colorSpeed={0.8}
           />
-          <SmoothCursor />
-          {children}
+          <ClickSpark
+            sparkCount={9}
+            sparkSize={13}
+            sparkRadius={28}
+            duration={450}
+            ring
+          >
+            <SmoothCursor />
+            {children}
+          </ClickSpark>
         </body>
       </html>
     </ClerkProvider>
